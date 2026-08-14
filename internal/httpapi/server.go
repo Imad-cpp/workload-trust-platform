@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
+	"github.com/Imad-cpp/workload-trust-platform/internal/registration"
 	"github.com/Imad-cpp/workload-trust-platform/internal/workload"
 )
 
@@ -21,18 +22,20 @@ type ReadinessChecker interface {
 }
 
 type Dependencies struct {
-	Readiness     ReadinessChecker
-	Workloads     workload.Lister
-	Authenticator operatorauth.Authenticator
-	Authorizer    operatorauth.Authorizer
+	Readiness             ReadinessChecker
+	Workloads             workload.Lister
+	RegistrationMutations registration.Mutator
+	Authenticator         operatorauth.Authenticator
+	Authorizer            operatorauth.Authorizer
 }
 
 type Server struct {
-	readiness     ReadinessChecker
-	workloads     workload.Lister
-	authenticator operatorauth.Authenticator
-	authorizer    operatorauth.Authorizer
-	handler       http.Handler
+	readiness             ReadinessChecker
+	workloads             workload.Lister
+	registrationMutations registration.Mutator
+	authenticator         operatorauth.Authenticator
+	authorizer            operatorauth.Authorizer
+	handler               http.Handler
 }
 
 type errorEnvelope struct {
@@ -56,6 +59,9 @@ func New(deps Dependencies) (*Server, error) {
 	if deps.Workloads == nil {
 		return nil, errors.New("workload lister is required")
 	}
+	if deps.RegistrationMutations == nil {
+		return nil, errors.New("registration mutation service is required")
+	}
 	if deps.Authenticator == nil {
 		return nil, errors.New("operator authenticator is required")
 	}
@@ -64,14 +70,17 @@ func New(deps Dependencies) (*Server, error) {
 	}
 
 	s := &Server{
-		readiness:     deps.Readiness,
-		workloads:     deps.Workloads,
-		authenticator: deps.Authenticator,
-		authorizer:    deps.Authorizer,
+		readiness:             deps.Readiness,
+		workloads:             deps.Workloads,
+		registrationMutations: deps.RegistrationMutations,
+		authenticator:         deps.Authenticator,
+		authorizer:            deps.Authorizer,
 	}
 
 	apiMux := http.NewServeMux()
 	apiMux.Handle("/v1/workloads", s.requirePermission(operatorauth.PermissionWorkloadsRead, getOnly(s.listWorkloads)))
+	apiMux.Handle("POST /v1/registration-rules", s.requirePermission(operatorauth.PermissionRegistrationsWrite, http.HandlerFunc(s.createRegistrationRule)))
+	apiMux.Handle("PATCH /v1/registration-rules/{id}", s.requirePermission(operatorauth.PermissionRegistrationsWrite, http.HandlerFunc(s.replaceRegistrationRule)))
 	apiMux.HandleFunc("/", s.notFound)
 
 	rootMux := http.NewServeMux()
