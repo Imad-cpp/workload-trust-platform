@@ -8,7 +8,7 @@ SERVER="${LAB_DIR}/bin/spire-server"
 AGENT="${LAB_DIR}/bin/spire-agent"
 SERVER_SOCKET="${RUNTIME_DIR}/server.sock"
 AGENT_SOCKET="${RUNTIME_DIR}/agent.sock"
-AGENT_ID="spiffe://workload-trust.test/spire/agent/lab"
+AGENT_ID="spiffe://workload-trust.test/agent/lab"
 
 "${ROOT}/scripts/lab-down.sh" >/dev/null 2>&1 || true
 "${ROOT}/scripts/fetch-spire.sh"

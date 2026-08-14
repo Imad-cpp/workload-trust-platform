@@ -48,10 +48,10 @@ The `.test` top-level domain is reserved for testing. This is a lab naming decis
 The lab uses the SPIRE `join_token` NodeAttestor and requests the stable lab agent identity:
 
 ```text
-spiffe://workload-trust.test/spire/agent/lab
+spiffe://workload-trust.test/agent/lab
 ```
 
-Join tokens are one-time bootstrap credentials. The agent config also uses `insecure_bootstrap = true` **only for the local lab** to bootstrap trust in the local SPIRE Server. This is explicitly not a production node-attestation/bootstrap design.
+The custom ID intentionally avoids SPIRE's reserved `/spire/...` namespace. Join tokens are one-time bootstrap credentials. The agent config also uses `insecure_bootstrap = true` **only for the local lab** to bootstrap trust in the local SPIRE Server. This is explicitly not a production node-attestation/bootstrap design.
 
 ## Workload selectors
 

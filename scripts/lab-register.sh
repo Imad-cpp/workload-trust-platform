@@ -4,7 +4,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER="${ROOT}/.lab/bin/spire-server"
 SERVER_SOCKET="/tmp/workload-trust-lab/server.sock"
-PARENT_ID="spiffe://workload-trust.test/spire/agent/lab"
+PARENT_ID="spiffe://workload-trust.test/agent/lab"
 TRUST_DOMAIN="spiffe://workload-trust.test"
 
 [[ -x "${SERVER}" ]] || { echo "Run scripts/lab-up.sh first." >&2; exit 1; }
