@@ -77,3 +77,23 @@ func TestValidateAcceptsIPv6Loopback(t *testing.T) {
 		t.Fatalf("Validate() error = %v", err)
 	}
 }
+
+func TestLoadReconcilerUsesLocalSPIRESocketDefault(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("WTP_SPIRE_SERVER_SOCKET", "")
+	cfg, err := LoadReconciler()
+	if err != nil {
+		t.Fatalf("LoadReconciler() error = %v", err)
+	}
+	if cfg.SPIREServerSocket != "/tmp/workload-trust-lab/server.sock" {
+		t.Fatalf("SPIREServerSocket = %q", cfg.SPIREServerSocket)
+	}
+}
+
+func TestLoadReconcilerRejectsRelativeSocket(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("WTP_SPIRE_SERVER_SOCKET", "relative/server.sock")
+	if _, err := LoadReconciler(); err == nil {
+		t.Fatal("expected relative SPIRE socket to be rejected")
+	}
+}

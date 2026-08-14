@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-const defaultListenAddr = "127.0.0.1:8080"
+const (
+	defaultListenAddr        = "127.0.0.1:8080"
+	defaultSPIREServerSocket = "/tmp/workload-trust-lab/server.sock"
+)
 
 var operatorIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._@:-]{2,127}$`)
 
@@ -18,6 +21,11 @@ type Config struct {
 	DatabaseURL   string
 	OperatorID    string
 	OperatorToken string
+}
+
+type ReconcilerConfig struct {
+	DatabaseURL       string
+	SPIREServerSocket string
 }
 
 func Load() (Config, error) {
@@ -51,6 +59,21 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+func LoadReconciler() (ReconcilerConfig, error) {
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		return ReconcilerConfig{}, errors.New("DATABASE_URL is required")
+	}
+	socketPath := strings.TrimSpace(os.Getenv("WTP_SPIRE_SERVER_SOCKET"))
+	if socketPath == "" {
+		socketPath = defaultSPIREServerSocket
+	}
+	if !strings.HasPrefix(socketPath, "/") {
+		return ReconcilerConfig{}, errors.New("WTP_SPIRE_SERVER_SOCKET must be an absolute path")
+	}
+	return ReconcilerConfig{DatabaseURL: databaseURL, SPIREServerSocket: socketPath}, nil
 }
 
 func (c Config) Validate() error {

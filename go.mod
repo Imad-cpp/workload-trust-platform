@@ -4,7 +4,11 @@ go 1.26.0
 
 toolchain go1.26.5
 
-require github.com/jackc/pgx/v5 v5.10.0
+require (
+	github.com/jackc/pgx/v5 v5.10.0
+	github.com/spiffe/spire-api-sdk v1.15.2
+	google.golang.org/grpc v1.74.2
+)
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
