@@ -35,7 +35,7 @@ for _ in $(seq 1 60); do
 done
 "${SERVER}" healthcheck -socketPath "${SERVER_SOCKET}" >/dev/null
 
-TOKEN="$(${SERVER} token generate -socketPath "${SERVER_SOCKET}" | awk '{print $2}' | tr -d '\r')"
+TOKEN="$(${SERVER} token generate -socketPath "${SERVER_SOCKET}" | awk '/^Token:/ {print $2; exit}' | tr -d '\r')"
 [[ -n "${TOKEN}" ]] || { echo "Failed to generate SPIRE join token." >&2; exit 1; }
 AGENT_ID="spiffe://workload-trust.test/spire/agent/join_token/${TOKEN}"
 
