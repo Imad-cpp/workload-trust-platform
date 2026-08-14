@@ -131,12 +131,30 @@ func (s *Service) createOrBind(ctx context.Context, rule registration.Rule, desi
 	if !ownedByRule(result.Entry, rule.ID) {
 		return false, s.conflict(ctx, rule, result.Entry.ID, correlationID)
 	}
+
 	operation := "create"
 	changed := true
 	if result.Disposition == spiremgmt.CreateDispositionExisting {
-		operation = "bind_owned_existing"
-		changed = false
+		desired.ID = result.Entry.ID
+		if entriesEquivalent(result.Entry, desired) {
+			operation = "bind_owned_existing"
+			changed = false
+		} else {
+			updated, err := s.spire.UpdateEntry(ctx, desired)
+			if errors.Is(err, spiremgmt.ErrNotFound) {
+				return false, s.failRule(ctx, rule, "spire_update_race", err)
+			}
+			if err != nil {
+				return false, s.failRule(ctx, rule, "spire_update_failed", err)
+			}
+			if !ownedByRule(updated, rule.ID) {
+				return false, s.conflict(ctx, rule, updated.ID, correlationID)
+			}
+			result.Entry = updated
+			operation = "update_owned_existing"
+		}
 	}
+
 	if err := s.recordAudit(ctx, rule, correlationID, operation, result.Entry.ID); err != nil {
 		return false, err
 	}

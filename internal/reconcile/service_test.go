@@ -118,6 +118,34 @@ func TestExistingForeignEntryIsNeverAdopted(t *testing.T) {
 	}
 }
 
+func TestExistingOwnedDriftIsUpdatedBeforeBinding(t *testing.T) {
+	rule := baseRule()
+	existing := spiremgmt.Entry{
+		ID:             "entry-owned",
+		SPIFFEID:       rule.WorkloadSPIFFEID,
+		ParentSPIFFEID: *rule.ParentSPIFFEID,
+		Selectors:      append([]string(nil), rule.Selectors...),
+		X509SVIDTTL:    120,
+		Hint:           ownerHintPrefix + rule.ID,
+	}
+	updated := existing
+	updated.X509SVIDTTL = rule.X509SVIDTTLSeconds
+	store := &ruleStoreStub{rules: []registration.Rule{rule}}
+	spire := &spireStub{
+		createResult: spiremgmt.CreateResult{Entry: existing, Disposition: spiremgmt.CreateDispositionExisting},
+		updated:      updated,
+	}
+	service, _ := New(store, spire, &auditStub{})
+
+	summary, err := service.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if summary.Changed != 1 || spire.updateCalls != 1 || store.convergedID == nil || *store.convergedID != existing.ID {
+		t.Fatalf("unexpected recovery result: summary=%#v updates=%d bound=%v", summary, spire.updateCalls, store.convergedID)
+	}
+}
+
 func TestAbsentOwnedEntryIsDeleted(t *testing.T) {
 	rule := baseRule()
 	rule.DesiredState = "absent"
