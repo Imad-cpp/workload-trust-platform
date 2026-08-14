@@ -16,3 +16,9 @@ All notable changes to this project will be documented here.
 - Restart/re-attestation evidence across distinct Docker containers.
 - Automatic short-lived X.509-SVID rotation evidence from the streaming Workload API.
 - Redacted SPIRE failure diagnostics for CI troubleshooting.
+- Phase 2 Go control-plane process with loopback-only read-only HTTP API.
+- PostgreSQL control-plane schema and apply/rollback/apply migration tests.
+- Real PostgreSQL workload and audit repository integration tests.
+- Append-only audit events and access-policy versions enforced by PostgreSQL triggers.
+- Go module-integrity, formatting, vet and race-detector CI.
+- ADR-0006 protecting the unauthenticated operator boundary from non-loopback/mutation exposure.

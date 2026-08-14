@@ -1,0 +1,73 @@
+name: Go Control Plane Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18.4-alpine
+        env:
+          POSTGRES_DB: workload_trust_test
+          POSTGRES_USER: workload_trust
+          POSTGRES_PASSWORD: workload-trust-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workload_trust -d workload_trust_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://workload_trust:workload-trust-ci@127.0.0.1:5432/workload_trust_test?sslmode=disable
+      TEST_DATABASE_URL: postgres://workload_trust:workload-trust-ci@127.0.0.1:5432/workload_trust_test?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.5
+          cache: false
+
+      - name: Verify committed module graph is tidy
+        run: |
+          go mod tidy
+          status="$(git status --porcelain -- go.mod go.sum)"
+          if [[ -n "${status}" ]]; then
+            echo "Go module metadata is not committed in tidy form:"
+            printf '%s\n' "${status}"
+            echo "--- GO_MOD_START ---"
+            cat go.mod
+            echo "--- GO_MOD_END ---"
+            echo "--- GO_SUM_START ---"
+            cat go.sum
+            echo "--- GO_SUM_END ---"
+            exit 1
+          fi
+
+      - name: Download modules from committed graph
+        run: go mod download
+
+      - name: Verify formatting
+        run: test -z "$(gofmt -l apps internal)"
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Verify PostgreSQL migrations and append-only audit invariant
+        run: ./scripts/test-migrations.sh
+
+      - name: Test with race detector and real PostgreSQL repository integration
+        run: go test -race -count=1 ./...

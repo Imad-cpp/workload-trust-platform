@@ -10,6 +10,7 @@ Date: 2026-08-14
 | ADR-0003 | Modular control plane for V1, not microservices | Accepted |
 | ADR-0004 | PostgreSQL as product-state source of truth | Accepted |
 | ADR-0005 | Host-native SPIRE + Docker-label attestation for Phase 1 lab | Accepted |
+| ADR-0006 | Read-only loopback operator API before authentication | Accepted |
 
 ## Product decisions
 
@@ -27,5 +28,13 @@ Date: 2026-08-14
 - The local lab agent uses a one-time join token and `insecure_bootstrap`; neither is a production bootstrap claim.
 - Docker workload identity in the lab requires both workload-name and environment labels.
 - Phase 1 proves identity issuance and negative attestation cases only; authorization remains a later phase.
+
+## Phase 2 foundation decisions
+
+- Go toolchain baseline is pinned through `go.mod`/CI and the module graph must be committed in tidy form before compilation.
+- PostgreSQL schema migrations are tested apply/rollback/apply against a real PostgreSQL service.
+- `audit_events` and `access_policy_versions` are append-only at the PostgreSQL layer.
+- the current operator HTTP API is read-only and loopback-only because operator authentication/authorization is not implemented yet.
+- no public mutation route will be added until ADR-0006 is intentionally superseded.
 
 See `docs/adr/` for rationale.
