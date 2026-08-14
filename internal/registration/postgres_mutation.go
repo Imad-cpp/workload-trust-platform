@@ -129,11 +129,11 @@ func (s *PostgresMutationService) ReplaceDesired(ctx context.Context, actor Muta
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
 	var (
-		organizationID string
-		workloadID     string
-		beforeState    string
-		beforeRevision int64
-		beforeTTL      int32
+		organizationID  string
+		workloadID      string
+		beforeState     string
+		beforeRevision  int64
+		beforeTTL       int32
 		beforeSelectors []byte
 	)
 	if err := tx.QueryRow(ctx, `

@@ -15,8 +15,8 @@ const (
 type Permission string
 
 const (
-	PermissionWorkloadsRead     Permission = "workloads:read"
-	PermissionRegistrationsRead Permission = "registrations:read"
+	PermissionWorkloadsRead      Permission = "workloads:read"
+	PermissionRegistrationsRead  Permission = "registrations:read"
 	PermissionRegistrationsWrite Permission = "registrations:write"
 )
 
