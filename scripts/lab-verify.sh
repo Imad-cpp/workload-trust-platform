@@ -4,6 +4,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE="${ROOT}/examples/identity-lab/compose.yaml"
 TRUST_PREFIX="spiffe://workload-trust.test/lab/"
+SYNC_TIMEOUT_SECONDS=15
 
 probe() {
   local service="$1"
@@ -13,21 +14,36 @@ probe() {
 assert_identity() {
   local service="$1"
   local expected="${TRUST_PREFIX}${service}"
-  local output
+  local output=""
+  local status=1
+  local deadline=$((SECONDS + SYNC_TIMEOUT_SECONDS))
 
-  output="$(probe "${service}")" || {
-    echo "Identity probe failed for ${service}:" >&2
-    echo "${output}" >&2
-    exit 1
-  }
+  # SPIRE Agent synchronizes authorized entries from the server asynchronously.
+  # Poll the real Workload API instead of relying on a fixed sleep so a freshly
+  # registered workload is verified as soon as its entry reaches the agent.
+  while (( SECONDS < deadline )); do
+    set +e
+    output="$(probe "${service}")"
+    status=$?
+    set -e
 
-  grep -Fq "${expected}" <<<"${output}" || {
-    echo "Expected SPIFFE ID not found for ${service}: ${expected}" >&2
-    echo "${output}" >&2
-    exit 1
-  }
+    if [[ ${status} -eq 0 ]] && grep -Fq "${expected}" <<<"${output}"; then
+      echo "PASS identity: ${service} -> ${expected}"
+      return 0
+    fi
 
-  echo "PASS identity: ${service} -> ${expected}"
+    if grep -Fq "${TRUST_PREFIX}" <<<"${output}" && ! grep -Fq "${expected}" <<<"${output}"; then
+      echo "Unexpected lab identity returned for ${service}." >&2
+      echo "${output}" >&2
+      return 1
+    fi
+
+    sleep 1
+  done
+
+  echo "Identity probe did not converge for ${service} within ${SYNC_TIMEOUT_SECONDS}s." >&2
+  echo "${output}" >&2
+  return 1
 }
 
 assert_no_lab_identity() {
@@ -48,6 +64,9 @@ assert_no_lab_identity() {
   echo "PASS negative identity: ${service} received no registered lab identity (exit=${status})"
 }
 
+# The first positive probe doubles as a deterministic wait for the agent's
+# authorized-entry synchronization cycle. Once it succeeds, all registrations
+# were created in the same batch and the negative probes are meaningful.
 assert_identity frontend
 assert_identity orders-api
 assert_identity payment-api

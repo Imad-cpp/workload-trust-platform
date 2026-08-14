@@ -79,6 +79,12 @@ spiffe://workload-trust.test/lab/frontend
 
 Labels are appropriate for proving Docker workload-attestation mechanics in a controlled lab. They are **not** claimed as a sufficient high-assurance production selector if an attacker controls Docker workload creation and can freely choose labels. Stronger production attestation is a later design problem.
 
+## Entry synchronization
+
+Workload registration entries are created through the SPIRE Server and reach the Agent asynchronously. SPIRE's current default authorized-entry sync interval is 5 seconds. The verification script therefore polls the real Workload API for up to 15 seconds for the first positive identity instead of using a brittle fixed sleep. A timeout fails the test; it never converts an unknown state into success.
+
+The lab keeps Docker container-locator diagnostics enabled at DEBUG level. CI only emits the tail of these diagnostics when a run fails, and redacts join-token values embedded in SPIRE agent IDs before printing them.
+
 ## Positive tests
 
 The lab must prove all four expected identities:
@@ -140,5 +146,6 @@ Or execute the CI-equivalent lifecycle:
 - workload probes use the local Workload API socket;
 - the lab containers run with `network_mode: none` because identity retrieval requires no application network access;
 - the join token and generated parent identity are kept out of committed files and normal success output;
+- CI diagnostic logs redact join-token values embedded in agent SPIFFE IDs;
 - runtime state is ephemeral and excluded from Git;
 - authorization has not been implemented yet, so a successful SVID must not be described as permission to call another service.
