@@ -10,7 +10,9 @@ Date: 2026-08-14
 | ADR-0003 | Modular control plane for V1, not microservices | Accepted |
 | ADR-0004 | PostgreSQL as product-state source of truth | Accepted |
 | ADR-0005 | Host-native SPIRE + Docker-label attestation for Phase 1 lab | Accepted |
-| ADR-0006 | Read-only loopback operator API before authentication | Accepted |
+| ADR-0006 | Read-only loopback operator API before authentication | Superseded by ADR-0007 for auth |
+| ADR-0007 | High-entropy bearer auth for the local operator API | Accepted |
+| ADR-0008 | Ownership-safe SPIRE registration reconciliation | Accepted |
 
 ## Product decisions
 
@@ -29,12 +31,15 @@ Date: 2026-08-14
 - Docker workload identity in the lab requires both workload-name and environment labels.
 - Phase 1 proves identity issuance and negative attestation cases only; authorization remains a later phase.
 
-## Phase 2 foundation decisions
+## Phase 2 decisions
 
-- Go toolchain baseline is pinned through `go.mod`/CI and the module graph must be committed in tidy form before compilation.
+- Go toolchain/module metadata is pinned and CI rejects a non-tidy module graph before compilation.
 - PostgreSQL schema migrations are tested apply/rollback/apply against a real PostgreSQL service.
 - `audit_events` and `access_policy_versions` are append-only at the PostgreSQL layer.
-- the current operator HTTP API is read-only and loopback-only because operator authentication/authorization is not implemented yet.
-- no public mutation route will be added until ADR-0006 is intentionally superseded.
+- `/v1/*` now requires the ADR-0007 local operator bearer credential; health/readiness remain generic and unauthenticated.
+- the HTTP listener remains loopback-only and there is still no HTTP mutation endpoint.
+- registration desired state is reconciled to SPIRE through the official Entry API over the local Unix management socket.
+- managed SPIRE entries use `wtp-rule:<rule-id>` as a non-cryptographic ownership convention; foreign entries fail closed rather than being adopted/mutated.
+- reconciliation audit metadata excludes parent SPIFFE IDs and selector values.
 
 See `docs/adr/` for rationale.
