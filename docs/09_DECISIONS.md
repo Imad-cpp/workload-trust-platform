@@ -13,6 +13,7 @@ Date: 2026-08-14
 | ADR-0006 | Read-only loopback operator API before authentication | Superseded by ADR-0007 for auth |
 | ADR-0007 | High-entropy bearer auth for the local operator API | Accepted |
 | ADR-0008 | Ownership-safe SPIRE registration reconciliation | Accepted |
+| ADR-0009 | Fail-closed roles + transactionally audited registration mutations | Accepted |
 
 ## Product decisions
 
@@ -20,7 +21,7 @@ Date: 2026-08-14
 - `Workload Trust Platform` is a neutral engineering working name only.
 - V1 targets Docker/Linux before Kubernetes/cloud integrations.
 - X.509-SVID is the primary V1 workload authentication mechanism.
-- Authorization is deterministic and default-deny.
+- Workload authorization is deterministic and default-deny.
 - Custom cryptography is prohibited.
 
 ## Phase 1 lab decisions
@@ -29,17 +30,21 @@ Date: 2026-08-14
 - Lab trust domain is `workload-trust.test`.
 - The local lab agent uses a one-time join token and `insecure_bootstrap`; neither is a production bootstrap claim.
 - Docker workload identity in the lab requires both workload-name and environment labels.
-- Phase 1 proves identity issuance and negative attestation cases only; authorization remains a later phase.
+- Phase 1 proves identity issuance and negative attestation cases only; workload authorization remains later work.
 
 ## Phase 2 decisions
 
 - Go toolchain/module metadata is pinned and CI rejects a non-tidy module graph before compilation.
-- PostgreSQL schema migrations are tested apply/rollback/apply against a real PostgreSQL service.
+- PostgreSQL migrations are tested apply/rollback/apply against real PostgreSQL.
 - `audit_events` and `access_policy_versions` are append-only at the PostgreSQL layer.
-- `/v1/*` now requires the ADR-0007 local operator bearer credential; health/readiness remain generic and unauthenticated.
-- the HTTP listener remains loopback-only and there is still no HTTP mutation endpoint.
+- `/v1/*` requires the ADR-0007 bearer credential; health/readiness remain generic and unauthenticated.
+- the HTTP listener remains loopback-only.
+- local operator roles are `viewer` and `operator`; missing role defaults to `viewer`, unsupported roles fail closed.
+- registration POST/PATCH requires server-side `registrations:write` authorization.
+- registration PATCH is a full desired-state replacement with optimistic `expected_revision`, not JSON Merge Patch.
+- registration mutation + operator audit commit atomically in one PostgreSQL transaction; audit failure rolls back state.
+- mutation responses/audit metadata omit selector values and parent SPIFFE IDs.
 - registration desired state is reconciled to SPIRE through the official Entry API over the local Unix management socket.
 - managed SPIRE entries use `wtp-rule:<rule-id>` as a non-cryptographic ownership convention; foreign entries fail closed rather than being adopted/mutated.
-- reconciliation audit metadata excludes parent SPIFFE IDs and selector values.
 
 See `docs/adr/` for rationale.

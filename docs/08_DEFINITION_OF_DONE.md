@@ -20,9 +20,9 @@ V1 is complete only when every required item below is evidenced.
 
 ## Authorization
 
-- [ ] Default deny enforced.
-- [ ] Allowed path succeeds.
-- [ ] Forbidden path fails.
+- [ ] Default deny service authorization enforced.
+- [ ] Allowed service path succeeds.
+- [ ] Forbidden service path fails.
 - [ ] Policy absence/corruption fails closed.
 - [ ] Decision contains safe, explainable reason metadata.
 
@@ -31,9 +31,9 @@ V1 is complete only when every required item below is evidenced.
 - [ ] Threat model reviewed against completed V1 implementation.
 - [ ] Security invariants have automated evidence where testable.
 - [ ] No private key or credential leakage in logs/API/UI test corpus.
-- [ ] Operator mutation authorization is server-side.
-- [ ] Security-critical mutations generate audit records.
-- [ ] Dependency/container/secret/static-analysis checks pass.
+- [x] Server-side authorization protects every currently implemented operator mutation. (ADR-0009 + Operator Mutation Integration)
+- [x] Every currently implemented security-critical mutation generates attributable append-only audit evidence. (registration desired-state + SPIRE reconciliation CI)
+- [ ] Dependency/container/secret/static-analysis checks pass for release candidate.
 
 ## Data
 
@@ -41,6 +41,8 @@ V1 is complete only when every required item below is evidenced.
 - [x] rollback strategy is tested. (Phase 2 CI apply/rollback/apply)
 - [x] policy version history is preserved against UPDATE/DELETE at the database layer. (Phase 2 migration tests)
 - [x] no workload private key is stored in product tables. (Phase 2 schema)
+- [x] registration desired-state mutation and operator audit are atomic; audit failure rolls back mutation. (Phase 2 real PostgreSQL test)
+- [x] stale registration revisions fail without lost-update mutation. (Phase 2 real PostgreSQL/HTTP tests)
 
 ## Reliability
 
@@ -52,7 +54,7 @@ V1 is complete only when every required item below is evidenced.
 ## UX/API
 
 - [ ] critical console flows have browser tests.
-- [x] current read-only HTTP API validation and stable error behavior tested. (Phase 2 Go tests)
+- [x] current HTTP API authentication, authorization, validation and stable error behavior are tested. (Go + Operator Mutation Integration)
 - [ ] accessibility baseline for console: keyboard navigation, focus visibility, semantic labels and sufficient target sizes.
 
 ## Documentation
@@ -60,7 +62,7 @@ V1 is complete only when every required item below is evidenced.
 - [ ] architecture matches completed V1 implementation.
 - [ ] threat model matches completed V1 implementation.
 - [ ] V1 security limitations are explicit.
-- [x] operator setup and identity-lab runbook exist. (Phase 1)
+- [x] operator setup and identity-lab runbook exist. (Phase 1/2)
 - [ ] API/CLI usage documented for completed V1.
 - [ ] changelog and release notes prepared.
 
