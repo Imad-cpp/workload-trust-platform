@@ -9,8 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
 	"github.com/Imad-cpp/workload-trust-platform/internal/workload"
 )
+
+const testOperatorToken = "0123456789abcdef0123456789abcdef"
 
 type readinessStub struct{ err error }
 
@@ -27,11 +30,25 @@ func (s workloadStub) ListByOrganization(context.Context, string) ([]workload.Wo
 
 func newTestHandler(t *testing.T, readinessErr error, lister workload.Lister) http.Handler {
 	t.Helper()
-	server, err := New(Dependencies{Readiness: readinessStub{err: readinessErr}, Workloads: lister})
+	authenticator, err := operatorauth.NewStaticBearer(testOperatorToken, "test-operator")
+	if err != nil {
+		t.Fatalf("NewStaticBearer() error = %v", err)
+	}
+	server, err := New(Dependencies{
+		Readiness:     readinessStub{err: readinessErr},
+		Workloads:     lister,
+		Authenticator: authenticator,
+	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
 	return server.Handler()
+}
+
+func authenticatedRequest(method, target string) *http.Request {
+	r := httptest.NewRequest(method, target, nil)
+	r.Header.Set("Authorization", "Bearer "+testOperatorToken)
+	return r
 }
 
 func TestHealth(t *testing.T) {
@@ -65,9 +82,26 @@ func TestReadinessFailureIsGeneric(t *testing.T) {
 	}
 }
 
+func TestOperatorAPIRequiresAuthentication(t *testing.T) {
+	h := newTestHandler(t, nil, workloadStub{})
+	r := httptest.NewRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+	if w.Header().Get("WWW-Authenticate") == "" {
+		t.Fatal("expected WWW-Authenticate header")
+	}
+	if !strings.Contains(w.Body.String(), `"code":"unauthorized"`) {
+		t.Fatalf("expected stable unauthorized error: %s", w.Body.String())
+	}
+}
+
 func TestListWorkloadsRequiresUUID(t *testing.T) {
 	h := newTestHandler(t, nil, workloadStub{})
-	r := httptest.NewRequest(http.MethodGet, "/v1/workloads?organization_id=not-a-uuid", nil)
+	r := authenticatedRequest(http.MethodGet, "/v1/workloads?organization_id=not-a-uuid")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -79,7 +113,7 @@ func TestListWorkloadsRequiresUUID(t *testing.T) {
 func TestListWorkloadsReturnsData(t *testing.T) {
 	items := []workload.Workload{{ID: "w1", Name: "frontend", SPIFFEID: "spiffe://workload-trust.test/lab/frontend", Status: "healthy"}}
 	h := newTestHandler(t, nil, workloadStub{items: items})
-	r := httptest.NewRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000", nil)
+	r := authenticatedRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -95,9 +129,9 @@ func TestListWorkloadsReturnsData(t *testing.T) {
 	}
 }
 
-func TestMutationEndpointDoesNotExist(t *testing.T) {
+func TestMutationEndpointStillDoesNotExist(t *testing.T) {
 	h := newTestHandler(t, nil, workloadStub{})
-	r := httptest.NewRequest(http.MethodPost, "/v1/workloads", nil)
+	r := authenticatedRequest(http.MethodPost, "/v1/workloads")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -112,9 +146,20 @@ func TestMutationEndpointDoesNotExist(t *testing.T) {
 	}
 }
 
-func TestUnknownRouteReturnsStableJSON(t *testing.T) {
+func TestUnknownOperatorRouteRequiresAuthenticationFirst(t *testing.T) {
 	h := newTestHandler(t, nil, workloadStub{})
-	r := httptest.NewRequest(http.MethodGet, "/unknown", nil)
+	r := httptest.NewRequest(http.MethodGet, "/v1/unknown", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestUnknownAuthenticatedRouteReturnsStableJSON(t *testing.T) {
+	h := newTestHandler(t, nil, workloadStub{})
+	r := authenticatedRequest(http.MethodGet, "/v1/unknown")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
@@ -128,7 +173,7 @@ func TestUnknownRouteReturnsStableJSON(t *testing.T) {
 
 func TestRepositoryErrorIsNotLeaked(t *testing.T) {
 	h := newTestHandler(t, nil, workloadStub{err: errors.New("postgres secret internal detail")})
-	r := httptest.NewRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000", nil)
+	r := authenticatedRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 
