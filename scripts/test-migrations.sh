@@ -23,6 +23,8 @@ DECLARE
     org_id uuid;
     domain_id uuid;
     workload_id uuid;
+    policy_id uuid;
+    policy_version_id uuid;
     audit_id uuid;
 BEGIN
     SELECT id INTO org_id FROM organizations WHERE slug = 'phase2-test';
@@ -41,6 +43,40 @@ BEGIN
         workload_id,
         '["docker:label:com.workload-trust.name:frontend", "docker:label:com.workload-trust.environment:lab"]'::jsonb
     );
+
+    INSERT INTO access_policies (organization_id, name)
+    VALUES (org_id, 'frontend-to-orders')
+    RETURNING id INTO policy_id;
+
+    INSERT INTO access_policy_versions (
+        policy_id, version, source_spiffe_id, destination_spiffe_id,
+        action, effect, created_by, change_reason
+    ) VALUES (
+        policy_id, 1,
+        'spiffe://workload-trust.test/lab/frontend',
+        'spiffe://workload-trust.test/lab/orders-api',
+        'connect', 'allow', 'migration-test', 'verify immutable policy history'
+    ) RETURNING id INTO policy_version_id;
+
+    BEGIN
+        UPDATE access_policy_versions SET effect = 'deny' WHERE id = policy_version_id;
+        RAISE EXCEPTION 'append-only policy version update unexpectedly succeeded';
+    EXCEPTION
+        WHEN raise_exception THEN
+            IF SQLERRM <> 'access_policy_versions are append-only' THEN
+                RAISE;
+            END IF;
+    END;
+
+    BEGIN
+        DELETE FROM access_policy_versions WHERE id = policy_version_id;
+        RAISE EXCEPTION 'append-only policy version delete unexpectedly succeeded';
+    EXCEPTION
+        WHEN raise_exception THEN
+            IF SQLERRM <> 'access_policy_versions are append-only' THEN
+                RAISE;
+            END IF;
+    END;
 
     INSERT INTO audit_events (
         organization_id, actor_type, actor_id, action, target_type, target_id, correlation_id, metadata
@@ -81,4 +117,4 @@ fi
 
 "${ROOT}/scripts/db-migrate.sh" up
 
-echo "PostgreSQL migration apply/rollback/apply test passed."
+echo "PostgreSQL migration apply/rollback/apply, policy-history, and audit append-only tests passed."

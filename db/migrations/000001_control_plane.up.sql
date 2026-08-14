@@ -83,6 +83,23 @@ ALTER TABLE access_policies
     ADD CONSTRAINT access_policies_active_version_fk
     FOREIGN KEY (active_version_id) REFERENCES access_policy_versions(id) ON DELETE RESTRICT;
 
+CREATE OR REPLACE FUNCTION reject_access_policy_version_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RAISE EXCEPTION 'access_policy_versions are append-only';
+END;
+$$;
+
+CREATE TRIGGER access_policy_versions_no_update
+BEFORE UPDATE ON access_policy_versions
+FOR EACH ROW EXECUTE FUNCTION reject_access_policy_version_mutation();
+
+CREATE TRIGGER access_policy_versions_no_delete
+BEFORE DELETE ON access_policy_versions
+FOR EACH ROW EXECUTE FUNCTION reject_access_policy_version_mutation();
+
 CREATE TABLE audit_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id uuid REFERENCES organizations(id) ON DELETE RESTRICT,
