@@ -18,7 +18,7 @@ It establishes:
 - stable JSON HTTP errors and request correlation;
 - real PostgreSQL integration tests in CI.
 
-It does **not** complete Phase 2. SPIRE reconciliation, authenticated operator mutations, registration-rule workflows, policy activation workflows and broader CLI diagnostics remain future work.
+It does not complete Phase 2. SPIRE reconciliation, authenticated operator mutations, registration-rule workflows, policy activation workflows and broader CLI diagnostics remain future work.
 
 ## Runtime
 
