@@ -31,7 +31,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	authenticator, err := operatorauth.NewStaticBearer(cfg.OperatorToken, cfg.OperatorID)
+	authenticator, err := operatorauth.NewStaticBearer(cfg.OperatorToken, cfg.OperatorID, cfg.OperatorRole)
 	if err != nil {
 		return err
 	}
@@ -50,6 +50,7 @@ func run(logger *slog.Logger) error {
 		Readiness:     pool,
 		Workloads:     workloads,
 		Authenticator: authenticator,
+		Authorizer:    operatorauth.RBAC{},
 	})
 	if err != nil {
 		return err

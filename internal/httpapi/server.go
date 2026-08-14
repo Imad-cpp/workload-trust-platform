@@ -24,12 +24,14 @@ type Dependencies struct {
 	Readiness     ReadinessChecker
 	Workloads     workload.Lister
 	Authenticator operatorauth.Authenticator
+	Authorizer    operatorauth.Authorizer
 }
 
 type Server struct {
 	readiness     ReadinessChecker
 	workloads     workload.Lister
 	authenticator operatorauth.Authenticator
+	authorizer    operatorauth.Authorizer
 	handler       http.Handler
 }
 
@@ -57,20 +59,24 @@ func New(deps Dependencies) (*Server, error) {
 	if deps.Authenticator == nil {
 		return nil, errors.New("operator authenticator is required")
 	}
+	if deps.Authorizer == nil {
+		return nil, errors.New("operator authorizer is required")
+	}
 
 	s := &Server{
 		readiness:     deps.Readiness,
 		workloads:     deps.Workloads,
 		authenticator: deps.Authenticator,
+		authorizer:    deps.Authorizer,
 	}
 
 	apiMux := http.NewServeMux()
-	apiMux.HandleFunc("/v1/workloads", getOnly(s.listWorkloads))
+	apiMux.Handle("/v1/workloads", s.requirePermission(operatorauth.PermissionWorkloadsRead, getOnly(s.listWorkloads)))
 	apiMux.HandleFunc("/", s.notFound)
 
 	rootMux := http.NewServeMux()
-	rootMux.HandleFunc("/healthz", getOnly(s.health))
-	rootMux.HandleFunc("/readyz", getOnly(s.ready))
+	rootMux.Handle("/healthz", getOnly(s.health))
+	rootMux.Handle("/readyz", getOnly(s.ready))
 	rootMux.Handle("/v1/", s.requireOperator(apiMux))
 	rootMux.HandleFunc("/", s.notFound)
 
@@ -126,6 +132,17 @@ func (s *Server) requireOperator(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) requirePermission(permission operatorauth.Permission, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := operatorPrincipalFrom(r)
+		if !ok || !s.authorizer.Allowed(principal, permission) {
+			writeError(w, r, http.StatusForbidden, "forbidden", "operator is not authorized for this action")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 type operatorPrincipalContextKey struct{}
 
 func operatorPrincipalFrom(r *http.Request) (operatorauth.Principal, bool) {
@@ -137,15 +154,15 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 	writeError(w, r, http.StatusNotFound, "not_found", "route not found")
 }
 
-func getOnly(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func getOnly(next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.Header().Set("Allow", http.MethodGet)
 			writeError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
 			return
 		}
 		next(w, r)
-	}
+	})
 }
 
 func requestIDMiddleware(next http.Handler) http.Handler {

@@ -28,9 +28,9 @@ func (s workloadStub) ListByOrganization(context.Context, string) ([]workload.Wo
 	return s.items, s.err
 }
 
-func newTestHandler(t *testing.T, readinessErr error, lister workload.Lister) http.Handler {
+func newTestHandler(t *testing.T, role operatorauth.Role, readinessErr error, lister workload.Lister) http.Handler {
 	t.Helper()
-	authenticator, err := operatorauth.NewStaticBearer(testOperatorToken, "test-operator")
+	authenticator, err := operatorauth.NewStaticBearer(testOperatorToken, "test-operator", role)
 	if err != nil {
 		t.Fatalf("NewStaticBearer() error = %v", err)
 	}
@@ -38,6 +38,7 @@ func newTestHandler(t *testing.T, readinessErr error, lister workload.Lister) ht
 		Readiness:     readinessStub{err: readinessErr},
 		Workloads:     lister,
 		Authenticator: authenticator,
+		Authorizer:    operatorauth.RBAC{},
 	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -52,7 +53,7 @@ func authenticatedRequest(method, target string) *http.Request {
 }
 
 func TestHealth(t *testing.T) {
-	h := newTestHandler(t, nil, workloadStub{})
+	h := newTestHandler(t, operatorauth.RoleViewer, nil, workloadStub{})
 	r := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -69,7 +70,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestReadinessFailureIsGeneric(t *testing.T) {
-	h := newTestHandler(t, errors.New("postgres password=do-not-leak"), workloadStub{})
+	h := newTestHandler(t, operatorauth.RoleViewer, errors.New("postgres password=do-not-leak"), workloadStub{})
 	r := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -83,7 +84,7 @@ func TestReadinessFailureIsGeneric(t *testing.T) {
 }
 
 func TestOperatorAPIRequiresAuthentication(t *testing.T) {
-	h := newTestHandler(t, nil, workloadStub{})
+	h := newTestHandler(t, operatorauth.RoleViewer, nil, workloadStub{})
 	r := httptest.NewRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -99,20 +100,9 @@ func TestOperatorAPIRequiresAuthentication(t *testing.T) {
 	}
 }
 
-func TestListWorkloadsRequiresUUID(t *testing.T) {
-	h := newTestHandler(t, nil, workloadStub{})
-	r := authenticatedRequest(http.MethodGet, "/v1/workloads?organization_id=not-a-uuid")
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
-	}
-}
-
-func TestListWorkloadsReturnsData(t *testing.T) {
+func TestViewerCanReadWorkloads(t *testing.T) {
 	items := []workload.Workload{{ID: "w1", Name: "frontend", SPIFFEID: "spiffe://workload-trust.test/lab/frontend", Status: "healthy"}}
-	h := newTestHandler(t, nil, workloadStub{items: items})
+	h := newTestHandler(t, operatorauth.RoleViewer, nil, workloadStub{items: items})
 	r := authenticatedRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -129,8 +119,19 @@ func TestListWorkloadsReturnsData(t *testing.T) {
 	}
 }
 
+func TestListWorkloadsRequiresUUID(t *testing.T) {
+	h := newTestHandler(t, operatorauth.RoleViewer, nil, workloadStub{})
+	r := authenticatedRequest(http.MethodGet, "/v1/workloads?organization_id=not-a-uuid")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
 func TestMutationEndpointStillDoesNotExist(t *testing.T) {
-	h := newTestHandler(t, nil, workloadStub{})
+	h := newTestHandler(t, operatorauth.RoleOperator, nil, workloadStub{})
 	r := authenticatedRequest(http.MethodPost, "/v1/workloads")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -147,7 +148,7 @@ func TestMutationEndpointStillDoesNotExist(t *testing.T) {
 }
 
 func TestUnknownOperatorRouteRequiresAuthenticationFirst(t *testing.T) {
-	h := newTestHandler(t, nil, workloadStub{})
+	h := newTestHandler(t, operatorauth.RoleViewer, nil, workloadStub{})
 	r := httptest.NewRequest(http.MethodGet, "/v1/unknown", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -158,7 +159,7 @@ func TestUnknownOperatorRouteRequiresAuthenticationFirst(t *testing.T) {
 }
 
 func TestUnknownAuthenticatedRouteReturnsStableJSON(t *testing.T) {
-	h := newTestHandler(t, nil, workloadStub{})
+	h := newTestHandler(t, operatorauth.RoleViewer, nil, workloadStub{})
 	r := authenticatedRequest(http.MethodGet, "/v1/unknown")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -172,7 +173,7 @@ func TestUnknownAuthenticatedRouteReturnsStableJSON(t *testing.T) {
 }
 
 func TestRepositoryErrorIsNotLeaked(t *testing.T) {
-	h := newTestHandler(t, nil, workloadStub{err: errors.New("postgres secret internal detail")})
+	h := newTestHandler(t, operatorauth.RoleViewer, nil, workloadStub{err: errors.New("postgres secret internal detail")})
 	r := authenticatedRequest(http.MethodGet, "/v1/workloads?organization_id=123e4567-e89b-12d3-a456-426614174000")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)

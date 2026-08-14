@@ -13,6 +13,7 @@ const MinTokenBytes = 32
 type Principal struct {
 	ActorType string
 	ActorID   string
+	Role      Role
 }
 
 type Authenticator interface {
@@ -24,12 +25,15 @@ type StaticBearer struct {
 	principal   Principal
 }
 
-func NewStaticBearer(token, actorID string) (*StaticBearer, error) {
+func NewStaticBearer(token, actorID string, role Role) (*StaticBearer, error) {
 	if len(token) < MinTokenBytes {
 		return nil, errors.New("operator token must be at least 32 bytes")
 	}
 	if strings.TrimSpace(actorID) == "" {
 		return nil, errors.New("operator actor ID is required")
+	}
+	if !role.Valid() {
+		return nil, errors.New("operator role is invalid")
 	}
 
 	return &StaticBearer{
@@ -37,6 +41,7 @@ func NewStaticBearer(token, actorID string) (*StaticBearer, error) {
 		principal: Principal{
 			ActorType: "operator",
 			ActorID:   actorID,
+			Role:      role,
 		},
 	}, nil
 }

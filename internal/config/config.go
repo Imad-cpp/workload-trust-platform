@@ -7,6 +7,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
 )
 
 const (
@@ -21,6 +23,7 @@ type Config struct {
 	DatabaseURL   string
 	OperatorID    string
 	OperatorToken string
+	OperatorRole  operatorauth.Role
 }
 
 type ReconcilerConfig struct {
@@ -49,11 +52,21 @@ func Load() (Config, error) {
 		return Config{}, errors.New("WTP_OPERATOR_TOKEN is required")
 	}
 
+	operatorRoleRaw := strings.TrimSpace(os.Getenv("WTP_OPERATOR_ROLE"))
+	if operatorRoleRaw == "" {
+		operatorRoleRaw = string(operatorauth.RoleViewer)
+	}
+	operatorRole, err := operatorauth.ParseRole(operatorRoleRaw)
+	if err != nil {
+		return Config{}, err
+	}
+
 	cfg := Config{
 		ListenAddr:    listenAddr,
 		DatabaseURL:   databaseURL,
 		OperatorID:    operatorID,
 		OperatorToken: operatorToken,
+		OperatorRole:  operatorRole,
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -96,6 +109,9 @@ func (c Config) Validate() error {
 	}
 	if strings.TrimSpace(c.OperatorToken) == "" {
 		return errors.New("WTP_OPERATOR_TOKEN is required")
+	}
+	if !c.OperatorRole.Valid() {
+		return errors.New("WTP_OPERATOR_ROLE is invalid")
 	}
 	return nil
 }
