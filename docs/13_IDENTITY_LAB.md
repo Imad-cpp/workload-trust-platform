@@ -85,6 +85,15 @@ Workload registration entries are created through the SPIRE Server and reach the
 
 The lab keeps Docker container-locator diagnostics enabled at DEBUG level. CI only emits the tail of these diagnostics when a run fails, and redacts join-token values embedded in SPIRE agent IDs before printing them.
 
+## X.509-SVID lifecycle test
+
+Lab registration entries use a deliberately short **12-second X.509-SVID TTL** so lifecycle behavior can be proven inside CI without weakening any production configuration (there is no production configuration yet).
+
+The lifecycle verification has two distinct checks:
+
+1. **Restart/re-issuance:** two separate one-off Docker containers with the same trusted labels must independently obtain the same logical SPIFFE ID. Their Docker container IDs must differ. This proves identity is recovered from attestation rather than a credential copied into the workload image.
+2. **Rotation:** one long-running `spire-agent api watch` probe remains attached to the Workload API. CI requires at least two X.509 context updates for the expected SPIFFE ID with distinct `SVID Valid Until` timestamps before the rotation timeout expires. The CLI prints validity metadata only; no workload private key is written or printed by this test.
+
 ## Positive tests
 
 The lab must prove all four expected identities:
@@ -145,6 +154,7 @@ Or execute the CI-equivalent lifecycle:
 - no workload private key is copied into the repository or host application database;
 - workload probes use the local Workload API socket;
 - the lab containers run with `network_mode: none` because identity retrieval requires no application network access;
+- lifecycle tests inspect SPIFFE IDs and certificate validity timestamps, not private-key material;
 - the join token and generated parent identity are kept out of committed files and normal success output;
 - CI diagnostic logs redact join-token values embedded in agent SPIFFE IDs;
 - runtime state is ephemeral and excluded from Git;

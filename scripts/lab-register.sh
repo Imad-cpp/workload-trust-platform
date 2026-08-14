@@ -6,6 +6,7 @@ SERVER="${ROOT}/.lab/bin/spire-server"
 SERVER_SOCKET="/tmp/workload-trust-lab/server.sock"
 AGENT_ID_FILE="${ROOT}/.lab/agent-id"
 TRUST_DOMAIN="spiffe://workload-trust.test"
+X509_SVID_TTL_SECONDS=12
 
 [[ -x "${SERVER}" ]] || { echo "Run scripts/lab-up.sh first." >&2; exit 1; }
 [[ -s "${AGENT_ID_FILE}" ]] || { echo "Lab agent identity state is missing; run scripts/lab-up.sh first." >&2; exit 1; }
@@ -24,10 +25,11 @@ register_workload() {
     -socketPath "${SERVER_SOCKET}" \
     -parentID "${PARENT_ID}" \
     -spiffeID "${spiffe_id}" \
+    -x509SVIDTTL "${X509_SVID_TTL_SECONDS}" \
     -selector "docker:label:com.workload-trust.name:${name}" \
     -selector "docker:label:com.workload-trust.environment:lab" >/dev/null
 
-  echo "Registered: ${spiffe_id}"
+  echo "Registered: ${spiffe_id} (X.509-SVID TTL=${X509_SVID_TTL_SECONDS}s)"
 }
 
 register_workload frontend
