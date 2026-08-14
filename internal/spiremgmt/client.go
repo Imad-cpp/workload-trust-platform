@@ -19,12 +19,12 @@ import (
 var ErrNotFound = errors.New("SPIRE entry not found")
 
 type Entry struct {
-	ID              string
-	SPIFFEID        string
-	ParentSPIFFEID  string
-	Selectors       []string
-	X509SVIDTTL     int32
-	Hint            string
+	ID             string
+	SPIFFEID       string
+	ParentSPIFFEID string
+	Selectors      []string
+	X509SVIDTTL    int32
+	Hint           string
 }
 
 type CreateDisposition string
@@ -74,7 +74,7 @@ func (c *GRPCClient) Close() error {
 }
 
 func (c *GRPCClient) GetEntry(ctx context.Context, id string) (Entry, error) {
-	value, err := c.entry.GetEntry(ctx, &entryv1.GetEntryRequest{ID: id, OutputMask: fullOutputMask()})
+	value, err := c.entry.GetEntry(ctx, &entryv1.GetEntryRequest{Id: id, OutputMask: fullOutputMask()})
 	if status.Code(err) == codes.NotFound {
 		return Entry{}, ErrNotFound
 	}
@@ -184,12 +184,12 @@ func toProtoEntry(entry Entry) (*types.Entry, error) {
 		return nil, errors.New("at least one selector is required")
 	}
 	return &types.Entry{
-		Id:           entry.ID,
-		SpiffeId:     spiffeID,
-		ParentId:     parentID,
-		Selectors:    selectors,
-		X509SvidTtl:  entry.X509SVIDTTL,
-		Hint:         entry.Hint,
+		Id:          entry.ID,
+		SpiffeId:    spiffeID,
+		ParentId:    parentID,
+		Selectors:   selectors,
+		X509SvidTtl: entry.X509SVIDTTL,
+		Hint:        entry.Hint,
 	}, nil
 }
 

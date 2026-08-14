@@ -2,7 +2,6 @@ package reconcile
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/Imad-cpp/workload-trust-platform/internal/audit"
@@ -168,8 +167,7 @@ func TestMissingParentFailsClosed(t *testing.T) {
 	store := &ruleStoreStub{rules: []registration.Rule{rule}}
 	service, _ := New(store, &spireStub{}, &auditStub{})
 
-	_, err := service.Run(context.Background())
-	if err == nil || !errors.Is(err, err) {
+	if _, err := service.Run(context.Background()); err == nil {
 		t.Fatal("expected invalid desired state error")
 	}
 	if store.errorCode != "invalid_desired_state" {
