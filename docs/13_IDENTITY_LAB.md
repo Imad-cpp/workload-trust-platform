@@ -1,6 +1,6 @@
 # 13 — SPIFFE/SPIRE Identity Lab
 
-Status: Phase 1 implementation  
+Status: Phase 1 complete  
 Date: 2026-08-14
 
 ## Purpose
@@ -96,7 +96,7 @@ The lifecycle verification has two distinct checks:
 
 ## Positive tests
 
-The lab must prove all four expected identities:
+The lab proves all four expected identities:
 
 | Container | Expected SPIFFE ID |
 |---|---|

@@ -27,6 +27,7 @@ REQUIRED_FILES = [
     "docs/11_OPEN_QUESTIONS.md",
     "docs/12_DATA_MODEL.md",
     "docs/13_IDENTITY_LAB.md",
+    "docs/14_PHASE1_EVIDENCE.md",
     "docs/adr/0001-go-core.md",
     "docs/adr/0002-spiffe-spire.md",
     "docs/adr/0003-modular-control-plane.md",
@@ -49,10 +50,17 @@ REQUIRED_PHRASES = {
     "docs/07_V1_SCOPE.md": ["Docker", "Linux"],
     "docs/08_DEFINITION_OF_DONE.md": ["security", "test"],
     "docs/13_IDENTITY_LAB.md": [
+        "Phase 1 complete",
         "workload-trust.test",
         "Docker workload-attestation",
         "insecure_bootstrap",
+        "12-second X.509-SVID TTL",
         "not a production",
+    ],
+    "docs/14_PHASE1_EVIDENCE.md": [
+        "Docker workload attestation",
+        "automatic SVID rotation",
+        "does not prove service authorization",
     ],
     "docs/adr/0005-v1-lab-attestation.md": ["host-native SPIRE", "Docker-label attestation"],
 }

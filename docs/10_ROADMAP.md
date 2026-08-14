@@ -20,24 +20,24 @@ Completed on main:
 - Definition of Done;
 - foundation CI validation.
 
-## Phase 1 — SPIFFE/SPIRE identity lab 🚧
+## Phase 1 — SPIFFE/SPIRE identity lab ✅
 
-Current slice:
+Completed/evidenced in the Phase 1 implementation:
 
 - reproducible SPIRE Server/Agent environment;
-- verified upstream SPIRE release download;
+- verified upstream SPIRE v1.15.2 release download;
 - Docker/Linux attestation using runtime Docker selectors;
 - four registered demo workload identities;
 - positive X.509-SVID retrieval tests;
-- unregistered/wrong-selector negative tests;
-- CI execution of the real identity runtime.
+- unregistered and wrong-selector negative tests;
+- asynchronous authorized-entry synchronization handled deterministically;
+- workload recreation/re-attestation across distinct Docker containers;
+- automatic short-lived X.509-SVID rotation observed through the streaming Workload API;
+- Docker locator failure diagnostics and CI log redaction;
+- selector/bootstrap limitations documented in the threat model and ADR;
+- real identity runtime executed by permanent CI.
 
-Remaining before Phase 1 exit:
-
-- explicit SVID rotation evidence/test;
-- restart/re-issuance behavior test;
-- final review of selector assumptions against the threat model;
-- Phase 1 evidence/runbook polish.
+Phase 1 establishes identity only. It does not claim service authorization, production-grade node attestation, or production readiness.
 
 ## Phase 2 — Go control plane
 
