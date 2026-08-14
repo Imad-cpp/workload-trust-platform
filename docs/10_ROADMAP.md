@@ -22,31 +22,44 @@ Completed on main:
 
 ## Phase 1 — SPIFFE/SPIRE identity lab ✅
 
-Completed/evidenced in the Phase 1 implementation:
+Completed/evidenced:
 
 - reproducible SPIRE Server/Agent environment;
 - verified upstream SPIRE v1.15.2 release download;
 - Docker/Linux attestation using runtime Docker selectors;
 - four registered demo workload identities;
-- positive X.509-SVID retrieval tests;
-- unregistered and wrong-selector negative tests;
-- asynchronous authorized-entry synchronization handled deterministically;
-- workload recreation/re-attestation across distinct Docker containers;
-- automatic short-lived X.509-SVID rotation observed through the streaming Workload API;
-- Docker locator failure diagnostics and CI log redaction;
-- selector/bootstrap limitations documented in the threat model and ADR;
-- real identity runtime executed by permanent CI.
+- positive and negative identity tests;
+- workload recreation/re-attestation;
+- automatic short-lived X.509-SVID rotation;
+- CI diagnostics/redaction;
+- permanent CI evidence on exact main commit.
 
-Phase 1 establishes identity only. It does not claim service authorization, production-grade node attestation, or production readiness.
+Phase 1 establishes identity only. It does not claim service authorization or production readiness.
 
-## Phase 2 — Go control plane
+## Phase 2 — Go control plane 🚧
 
-- database/migrations;
-- workload and registration model;
-- SPIRE reconciliation;
-- policy model and versioning;
-- audit foundation;
-- CLI diagnostics.
+Completed in the current foundation slice:
+
+- Go control-plane process with graceful shutdown and structured logging;
+- loopback-only read-only HTTP surface;
+- health/readiness endpoints;
+- PostgreSQL 18 schema/migrations;
+- workload inventory read repository and endpoint;
+- append-only audit repository primitive;
+- append-only access-policy version history at the database layer;
+- real PostgreSQL migration/repository integration tests;
+- Go formatting, module-graph, vet and race-detector CI.
+
+Remaining before Phase 2 exit:
+
+- explicit operator authentication/authorization model;
+- authenticated mutation/service workflows;
+- SPIRE desired-state reconciliation;
+- registration-rule lifecycle and drift handling;
+- policy activation workflow and audit linkage;
+- CLI diagnostics/inspection surface;
+- security review of the completed control-plane boundary;
+- Phase 2 evidence document and exact-main verification.
 
 ## Phase 3 — Authorization enforcement
 

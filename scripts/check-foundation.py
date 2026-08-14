@@ -28,11 +28,13 @@ REQUIRED_FILES = [
     "docs/12_DATA_MODEL.md",
     "docs/13_IDENTITY_LAB.md",
     "docs/14_PHASE1_EVIDENCE.md",
+    "docs/15_CONTROL_PLANE_FOUNDATION.md",
     "docs/adr/0001-go-core.md",
     "docs/adr/0002-spiffe-spire.md",
     "docs/adr/0003-modular-control-plane.md",
     "docs/adr/0004-postgresql-source-of-truth.md",
     "docs/adr/0005-v1-lab-attestation.md",
+    "docs/adr/0006-read-only-loopback-api-before-auth.md",
 ]
 
 REQUIRED_PHRASES = {
@@ -47,6 +49,7 @@ REQUIRED_PHRASES = {
     ],
     "docs/04_IDENTITY_MODEL.md": ["SPIFFE", "X.509-SVID"],
     "docs/05_POLICY_MODEL.md": ["ALLOW", "DENY"],
+    "docs/06_API_BOUNDARIES.md": ["loopback-only", "No HTTP mutation endpoint"],
     "docs/07_V1_SCOPE.md": ["Docker", "Linux"],
     "docs/08_DEFINITION_OF_DONE.md": ["security", "test"],
     "docs/13_IDENTITY_LAB.md": [
@@ -62,7 +65,17 @@ REQUIRED_PHRASES = {
         "automatic SVID rotation",
         "does not prove service authorization",
     ],
+    "docs/15_CONTROL_PLANE_FOUNDATION.md": [
+        "loopback-only",
+        "append-only",
+        "does not complete Phase 2",
+        "no workload mutation route exists",
+    ],
     "docs/adr/0005-v1-lab-attestation.md": ["host-native SPIRE", "Docker-label attestation"],
+    "docs/adr/0006-read-only-loopback-api-before-auth.md": [
+        "read-only and loopback-only",
+        "operator authentication/authorization",
+    ],
 }
 
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -107,7 +120,7 @@ def check_local_markdown_links() -> None:
 
 def check_readme_claim_boundary() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    required = "No production-readiness claim is made."
+    required = "No production deployment or production-readiness claim is made."
     if required not in readme:
         fail(f"README.md must keep the claim boundary: {required}")
 

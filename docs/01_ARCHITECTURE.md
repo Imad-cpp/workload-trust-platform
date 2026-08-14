@@ -1,148 +1,129 @@
 # 01 — Architecture
 
-Status: Draft foundation  
+Status: Evolving implementation  
 Date: 2026-08-14
 
 ## Architectural goal
 
-Keep V1 operationally simple while preserving clear domain boundaries. The first implementation is a modular control plane, not a fleet of independent microservices.
+Keep V1 operationally simple while preserving clear domain boundaries. The implementation is a modular Go control plane, not a fleet of independent microservices.
 
 ## System context
 
 ```text
 Operator
    |
-   v
-Web Console / CLI
-   |
+   |  Phase 2: loopback-only, read-only HTTP
    v
 Control Plane API -------------------- PostgreSQL
    |                                      |
-   |                                      +-- desired product state
-   |                                      +-- policy versions
-   |                                      +-- audit records
+   |                                      +-- product state
+   |                                      +-- immutable policy versions
+   |                                      +-- append-only audit records
    |
-   +--> SPIRE integration --> SPIRE Server
-   |                              |
-   |                          SPIRE Agents
-   |                              |
-   |                          Workloads
+   +--> future SPIRE reconciliation --> SPIRE Server
+   |                                         |
+   |                                     SPIRE Agents
+   |                                         |
+   |                                     Workloads
    |
-   +--> Authorization policy distribution / enforcement integration
+   +--> future authorization enforcement
 ```
 
-## Core components
+Phase 1 already proves the SPIRE workload-identity path independently. Phase 2 begins the product control plane. The two are intentionally not coupled through an untested reconciliation layer yet.
 
-### Operator console
+## Implemented components
 
-Next.js + React + TypeScript application for operator workflows. It is not part of the workload trust path.
+### Go control plane
 
-Initial views:
+Entry point: `apps/control-plane/main.go`.
 
-- overview;
-- nodes;
+Current responsibilities:
+
+- validated configuration;
+- loopback-only HTTP listener while unauthenticated;
+- structured JSON logging;
+- graceful shutdown;
+- PostgreSQL pool lifecycle;
+- health/readiness;
+- read-only workload inventory.
+
+Logical internal modules currently include:
+
+- configuration;
+- database;
+- HTTP API;
 - workloads;
-- identities;
-- policies;
-- audit log;
-- security events;
-- settings.
+- audit.
 
-### Control plane
-
-Go application responsible for product state and operator-facing APIs.
-
-Logical modules:
-
-- organizations;
-- trust domains;
-- nodes;
-- workloads;
-- registration rules;
-- access policies;
-- policy versions;
-- SPIRE reconciliation;
-- audit;
-- security events.
+Future modules remain planned for registration reconciliation, policy/authz, security events and SPIRE integration.
 
 ### PostgreSQL
 
-Source of truth for product configuration and audit metadata. It is not a storage location for workload private keys.
+Current source of truth for product configuration/history introduced by `000001_control_plane`:
 
-### SPIRE
+- organizations;
+- trust domains;
+- workloads;
+- registration rules;
+- access policies and append-only versions;
+- append-only audit events;
+- security events.
 
-Identity runtime responsible for node/workload attestation and SVID issuance. V1 integrates rather than forks SPIRE.
+It is not a workload private-key store.
 
-### Workload API
+### SPIRE identity lab
 
-Workloads obtain identity material from the local SPIFFE Workload Endpoint. V1 prefers Unix domain socket transport in the reference environment.
+Phase 1 provides the real identity runtime evidence. SPIRE is still not mutated by the Go control plane in this Phase 2 slice.
 
-### Enforcement layer
+## Planned components
 
-V1 will provide a reference enforcement path that:
+### Operator console
 
-1. establishes authenticated workload identity using X.509-SVIDs;
-2. extracts/verifies SPIFFE identities;
-3. evaluates deterministic source/destination/action policy;
-4. denies by default;
-5. records decision evidence without exposing key material.
+Next.js + React + TypeScript application. Not implemented yet.
 
-The exact implementation mechanism (purpose-built Go proxy versus Envoy-based integration) is an explicit Phase 1/2 decision and must be benchmarked before lock-in.
+### SPIRE reconciliation
 
-## Deployment topology — V1 lab
+The control plane will eventually reconcile desired workload registration state with supported SPIRE management surfaces. This is not implemented in the current slice.
 
-```text
-Docker/Linux host
+### Authorization enforcement
 
-SPIRE Server
-SPIRE Agent
-PostgreSQL
-Control Plane
-Console
-Reference Enforcement Component
-
-Demo workloads:
-- frontend
-- orders-api
-- payment-api
-- admin-api
-```
+Phase 3 will provide authenticated service identity verification plus deterministic default-deny policy enforcement. A valid SVID is not treated as authorization today.
 
 ## Repository shape
 
 ```text
 apps/
-  console/
   control-plane/
-  cli/
 internal/
-  identity/
-  policy/
   audit/
-  spire/
-  authz/
+  config/
+  database/
+  httpapi/
+  workload/
+db/
+  migrations/
 deploy/
-  docker/
+  dev/
   spire/
 examples/
-  zero-trust-lab/
+  identity-lab/
 docs/
   adr/
 ```
 
-The exact package layout can evolve after the Go scaffold exists; domain boundaries should remain explicit.
+The future console/CLI and policy/SPIRE integration packages will be added only when their slices begin.
 
 ## Trust boundaries
 
-1. Operator/browser ↔ control plane
+1. Local operator/process ↔ control-plane HTTP API (temporary loopback containment; no auth yet)
 2. Control plane ↔ PostgreSQL
-3. Control plane ↔ SPIRE management surface
+3. Future control plane ↔ SPIRE management surface
 4. SPIRE Server ↔ SPIRE Agent
 5. Workload ↔ local Workload API
-6. Workload ↔ enforcement layer ↔ destination workload
+6. Future workload ↔ enforcement layer ↔ destination workload
 7. CI/release system ↔ repository/artifacts
 
-Every boundary requires explicit authentication, authorization and transport assumptions before V1 release.
+Every remotely reachable management boundary requires explicit authentication and authorization before it can be opened.
 
 ## Availability posture
 

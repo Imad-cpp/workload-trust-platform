@@ -28,7 +28,7 @@ V1 is complete only when every required item below is evidenced.
 
 ## Security
 
-- [ ] Threat model reviewed against implementation.
+- [ ] Threat model reviewed against completed V1 implementation.
 - [ ] Security invariants have automated evidence where testable.
 - [ ] No private key or credential leakage in logs/API/UI test corpus.
 - [ ] Operator mutation authorization is server-side.
@@ -37,10 +37,10 @@ V1 is complete only when every required item below is evidenced.
 
 ## Data
 
-- [ ] PostgreSQL migrations apply from empty database.
-- [ ] rollback strategy is tested.
-- [ ] policy version history is preserved.
-- [ ] no workload private key is stored in product tables.
+- [x] PostgreSQL migrations apply from empty database. (Phase 2 CI)
+- [x] rollback strategy is tested. (Phase 2 CI apply/rollback/apply)
+- [x] policy version history is preserved against UPDATE/DELETE at the database layer. (Phase 2 migration tests)
+- [x] no workload private key is stored in product tables. (Phase 2 schema)
 
 ## Reliability
 
@@ -52,16 +52,16 @@ V1 is complete only when every required item below is evidenced.
 ## UX/API
 
 - [ ] critical console flows have browser tests.
-- [ ] API validation and stable error behavior tested.
+- [x] current read-only HTTP API validation and stable error behavior tested. (Phase 2 Go tests)
 - [ ] accessibility baseline for console: keyboard navigation, focus visibility, semantic labels and sufficient target sizes.
 
 ## Documentation
 
-- [ ] architecture matches implementation.
-- [ ] threat model matches implementation.
+- [ ] architecture matches completed V1 implementation.
+- [ ] threat model matches completed V1 implementation.
 - [ ] V1 security limitations are explicit.
 - [x] operator setup and identity-lab runbook exist. (Phase 1)
-- [ ] API/CLI usage documented.
+- [ ] API/CLI usage documented for completed V1.
 - [ ] changelog and release notes prepared.
 
 ## Release
