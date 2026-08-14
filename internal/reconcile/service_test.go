@@ -38,7 +38,9 @@ type spireStub struct {
 	updateCalls  int
 }
 
-func (s *spireStub) GetEntry(context.Context, string) (spiremgmt.Entry, error) { return s.getEntry, s.getErr }
+func (s *spireStub) GetEntry(context.Context, string) (spiremgmt.Entry, error) {
+	return s.getEntry, s.getErr
+}
 func (s *spireStub) CreateEntry(_ context.Context, _ spiremgmt.Entry) (spiremgmt.CreateResult, error) {
 	s.createCalls++
 	return s.createResult, s.createErr
