@@ -29,12 +29,15 @@ REQUIRED_FILES = [
     "docs/13_IDENTITY_LAB.md",
     "docs/14_PHASE1_EVIDENCE.md",
     "docs/15_CONTROL_PLANE_FOUNDATION.md",
+    "docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md",
     "docs/adr/0001-go-core.md",
     "docs/adr/0002-spiffe-spire.md",
     "docs/adr/0003-modular-control-plane.md",
     "docs/adr/0004-postgresql-source-of-truth.md",
     "docs/adr/0005-v1-lab-attestation.md",
     "docs/adr/0006-read-only-loopback-api-before-auth.md",
+    "docs/adr/0007-local-operator-bearer-auth.md",
+    "docs/adr/0008-spire-registration-reconciliation.md",
 ]
 
 REQUIRED_PHRASES = {
@@ -49,7 +52,7 @@ REQUIRED_PHRASES = {
     ],
     "docs/04_IDENTITY_MODEL.md": ["SPIFFE", "X.509-SVID"],
     "docs/05_POLICY_MODEL.md": ["ALLOW", "DENY"],
-    "docs/06_API_BOUNDARIES.md": ["loopback-only", "No HTTP mutation endpoint"],
+    "docs/06_API_BOUNDARIES.md": ["loopback-only", "operator authentication is required", "No HTTP mutation endpoint"],
     "docs/07_V1_SCOPE.md": ["Docker", "Linux"],
     "docs/08_DEFINITION_OF_DONE.md": ["security", "test"],
     "docs/13_IDENTITY_LAB.md": [
@@ -71,11 +74,19 @@ REQUIRED_PHRASES = {
         "does not complete Phase 2",
         "no workload mutation route exists",
     ],
+    "docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md": [
+        "constant-time",
+        "wtp-rule:",
+        "foreign",
+        "does not prove service authorization",
+    ],
     "docs/adr/0005-v1-lab-attestation.md": ["host-native SPIRE", "Docker-label attestation"],
     "docs/adr/0006-read-only-loopback-api-before-auth.md": [
         "read-only and loopback-only",
         "operator authentication/authorization",
     ],
+    "docs/adr/0007-local-operator-bearer-auth.md": ["loopback-only", "constant-time", "32 bytes"],
+    "docs/adr/0008-spire-registration-reconciliation.md": ["wtp-rule:", "foreign", "not a cryptographic ownership proof"],
 }
 
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")

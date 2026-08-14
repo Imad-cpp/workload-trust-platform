@@ -38,24 +38,27 @@ Phase 1 establishes identity only. It does not claim service authorization or pr
 
 ## Phase 2 — Go control plane 🚧
 
-Completed in the current foundation slice:
+Completed in the implemented Phase 2 slices:
 
 - Go control-plane process with graceful shutdown and structured logging;
-- loopback-only read-only HTTP surface;
-- health/readiness endpoints;
+- loopback-only HTTP surface with generic health/readiness endpoints;
+- authenticated `/v1/*` reads through a local high-entropy bearer credential and attributable operator ID;
 - PostgreSQL 18 schema/migrations;
 - workload inventory read repository and endpoint;
 - append-only audit repository primitive;
 - append-only access-policy version history at the database layer;
+- registration-rule reconciliation state/bindings;
+- official SPIRE v1.15.2 Entry API integration over the local Unix socket;
+- ownership-safe create/update/delete reconciliation and drift handling;
+- reconciliation audit linkage and foreign-entry refusal;
 - real PostgreSQL migration/repository integration tests;
+- permanent real SPIRE reconciliation lifecycle CI;
 - Go formatting, module-graph, vet and race-detector CI.
 
 Remaining before Phase 2 exit:
 
-- explicit operator authentication/authorization model;
-- authenticated mutation/service workflows;
-- SPIRE desired-state reconciliation;
-- registration-rule lifecycle and drift handling;
+- operator authorization model beyond the current single configured principal;
+- authenticated operator mutation/service workflows (HTTP mutation routes remain absent);
 - policy activation workflow and audit linkage;
 - CLI diagnostics/inspection surface;
 - security review of the completed control-plane boundary;

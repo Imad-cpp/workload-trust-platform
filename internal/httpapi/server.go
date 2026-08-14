@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
 	"github.com/Imad-cpp/workload-trust-platform/internal/workload"
 )
 
@@ -20,14 +21,16 @@ type ReadinessChecker interface {
 }
 
 type Dependencies struct {
-	Readiness ReadinessChecker
-	Workloads workload.Lister
+	Readiness     ReadinessChecker
+	Workloads     workload.Lister
+	Authenticator operatorauth.Authenticator
 }
 
 type Server struct {
-	readiness ReadinessChecker
-	workloads workload.Lister
-	handler   http.Handler
+	readiness     ReadinessChecker
+	workloads     workload.Lister
+	authenticator operatorauth.Authenticator
+	handler       http.Handler
 }
 
 type errorEnvelope struct {
@@ -51,14 +54,27 @@ func New(deps Dependencies) (*Server, error) {
 	if deps.Workloads == nil {
 		return nil, errors.New("workload lister is required")
 	}
+	if deps.Authenticator == nil {
+		return nil, errors.New("operator authenticator is required")
+	}
 
-	s := &Server{readiness: deps.Readiness, workloads: deps.Workloads}
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", getOnly(s.health))
-	mux.HandleFunc("/readyz", getOnly(s.ready))
-	mux.HandleFunc("/v1/workloads", getOnly(s.listWorkloads))
-	mux.HandleFunc("/", s.notFound)
-	s.handler = securityHeaders(requestIDMiddleware(mux))
+	s := &Server{
+		readiness:     deps.Readiness,
+		workloads:     deps.Workloads,
+		authenticator: deps.Authenticator,
+	}
+
+	apiMux := http.NewServeMux()
+	apiMux.HandleFunc("/v1/workloads", getOnly(s.listWorkloads))
+	apiMux.HandleFunc("/", s.notFound)
+
+	rootMux := http.NewServeMux()
+	rootMux.HandleFunc("/healthz", getOnly(s.health))
+	rootMux.HandleFunc("/readyz", getOnly(s.ready))
+	rootMux.Handle("/v1/", s.requireOperator(apiMux))
+	rootMux.HandleFunc("/", s.notFound)
+
+	s.handler = securityHeaders(requestIDMiddleware(rootMux))
 	return s, nil
 }
 
@@ -95,6 +111,26 @@ func (s *Server) listWorkloads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, workloadListResponse{Data: items})
+}
+
+func (s *Server) requireOperator(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		principal, ok := s.authenticator.Authenticate(r)
+		if !ok {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="workload-trust-platform"`)
+			writeError(w, r, http.StatusUnauthorized, "unauthorized", "operator authentication required")
+			return
+		}
+		ctx := context.WithValue(r.Context(), operatorPrincipalContextKey{}, principal)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+type operatorPrincipalContextKey struct{}
+
+func operatorPrincipalFrom(r *http.Request) (operatorauth.Principal, bool) {
+	principal, ok := r.Context().Value(operatorPrincipalContextKey{}).(operatorauth.Principal)
+	return principal, ok
 }
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
