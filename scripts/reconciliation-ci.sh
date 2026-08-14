@@ -247,10 +247,30 @@ if grep -Fq "${ENTRY_ID}" <<<"${POST_DELETE_VIEW}"; then
 fi
 wait_no_identity frontend-wrong-environment
 
-CREATE_AUDITS="$(sql_scalar -v rule="${RULE_ID}" -c "SELECT count(*) FROM audit_events WHERE target_id = :'rule' AND metadata->>'operation' = 'create'")"
-UPDATE_AUDITS="$(sql_scalar -v rule="${RULE_ID}" -c "SELECT count(*) FROM audit_events WHERE target_id = :'rule' AND metadata->>'operation' = 'update'")"
-DELETE_AUDITS="$(sql_scalar -v rule="${RULE_ID}" -c "SELECT count(*) FROM audit_events WHERE target_id = :'rule' AND metadata->>'operation' = 'delete'")"
-CONFLICT_AUDITS="$(sql_scalar -v rule="${FOREIGN_RULE_ID}" -c "SELECT count(*) FROM audit_events WHERE target_id = :'rule' AND metadata->>'operation' = 'ownership_conflict'")"
+CREATE_AUDITS="$(sql_scalar -v rule="${RULE_ID}" <<'SQL'
+SELECT count(*)
+FROM audit_events
+WHERE target_id = :'rule' AND metadata->>'operation' = 'create';
+SQL
+)"
+UPDATE_AUDITS="$(sql_scalar -v rule="${RULE_ID}" <<'SQL'
+SELECT count(*)
+FROM audit_events
+WHERE target_id = :'rule' AND metadata->>'operation' = 'update';
+SQL
+)"
+DELETE_AUDITS="$(sql_scalar -v rule="${RULE_ID}" <<'SQL'
+SELECT count(*)
+FROM audit_events
+WHERE target_id = :'rule' AND metadata->>'operation' = 'delete';
+SQL
+)"
+CONFLICT_AUDITS="$(sql_scalar -v rule="${FOREIGN_RULE_ID}" <<'SQL'
+SELECT count(*)
+FROM audit_events
+WHERE target_id = :'rule' AND metadata->>'operation' = 'ownership_conflict';
+SQL
+)"
 LEAK_AUDITS="$(sql_scalar -c "SELECT count(*) FROM audit_events WHERE action = 'spire.registration_reconcile' AND metadata::text LIKE '%join_token%'")"
 [[ "${CREATE_AUDITS}" -ge 1 && "${UPDATE_AUDITS}" -ge 1 && "${DELETE_AUDITS}" -ge 1 && "${CONFLICT_AUDITS}" -ge 1 ]] || {
   echo "Expected reconciliation audit evidence is incomplete." >&2
