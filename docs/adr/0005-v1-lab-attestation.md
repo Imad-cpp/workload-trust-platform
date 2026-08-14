@@ -16,7 +16,7 @@ For the Phase 1 Linux reference lab:
 - run SPIRE Server and SPIRE Agent directly on the Linux host;
 - use SPIRE `v1.15.2` release binaries with upstream SHA-256 verification;
 - use trust domain `workload-trust.test`;
-- bootstrap the lab agent with the one-time `join_token` NodeAttestor;
+- bootstrap the lab agent with the one-time `join_token` NodeAttestor and use SPIRE's generated reserved-namespace agent identity as the registration parent;
 - use `insecure_bootstrap = true` only to bootstrap trust in this local test environment;
 - use two Docker labels as workload selectors: workload name and `environment=lab`;
 - expose the Workload API to probe containers through a Unix socket mount;
@@ -35,6 +35,7 @@ For the Phase 1 Linux reference lab:
 
 - this is a Linux-only lab;
 - join-token + insecure bootstrap are not accepted as the production node-attestation/bootstrap model;
+- the join-token attestor embeds the consumed token value in the generated agent ID, so that parent identity remains ephemeral lab state;
 - Docker labels are not a high-assurance identity source against an attacker who controls Docker workload creation;
 - mTLS authorization is intentionally outside this ADR/phase.
 

@@ -45,13 +45,15 @@ The `.test` top-level domain is reserved for testing. This is a lab naming decis
 
 ## Agent bootstrap
 
-The lab uses the SPIRE `join_token` NodeAttestor and requests the stable lab agent identity:
+The lab uses the SPIRE `join_token` NodeAttestor. SPIRE assigns the attested agent an ID in its reserved join-token namespace:
 
 ```text
-spiffe://workload-trust.test/agent/lab
+spiffe://workload-trust.test/spire/agent/join_token/<one-time-token>
 ```
 
-The custom ID intentionally avoids SPIRE's reserved `/spire/...` namespace. Join tokens are one-time bootstrap credentials. The agent config also uses `insecure_bootstrap = true` **only for the local lab** to bootstrap trust in the local SPIRE Server. This is explicitly not a production node-attestation/bootstrap design.
+The token is one-time-use. Because SPIRE embeds that consumed token value in the agent SPIFFE ID for this attestor, the lab stores the resulting parent ID only in ignored ephemeral `.lab/agent-id` state and does not print or commit it.
+
+The agent config also uses `insecure_bootstrap = true` **only for the local lab** to bootstrap trust in the local SPIRE Server. This is explicitly not a production node-attestation/bootstrap design.
 
 ## Workload selectors
 
@@ -137,6 +139,6 @@ Or execute the CI-equivalent lifecycle:
 - no workload private key is copied into the repository or host application database;
 - workload probes use the local Workload API socket;
 - the lab containers run with `network_mode: none` because identity retrieval requires no application network access;
-- the join token is held only in shell memory for agent startup and is not printed or committed;
+- the join token and generated parent identity are kept out of committed files and normal success output;
 - runtime state is ephemeral and excluded from Git;
 - authorization has not been implemented yet, so a successful SVID must not be described as permission to call another service.

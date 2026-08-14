@@ -4,10 +4,12 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER="${ROOT}/.lab/bin/spire-server"
 SERVER_SOCKET="/tmp/workload-trust-lab/server.sock"
-PARENT_ID="spiffe://workload-trust.test/agent/lab"
+AGENT_ID_FILE="${ROOT}/.lab/agent-id"
 TRUST_DOMAIN="spiffe://workload-trust.test"
 
 [[ -x "${SERVER}" ]] || { echo "Run scripts/lab-up.sh first." >&2; exit 1; }
+[[ -s "${AGENT_ID_FILE}" ]] || { echo "Lab agent identity state is missing; run scripts/lab-up.sh first." >&2; exit 1; }
+PARENT_ID="$(cat "${AGENT_ID_FILE}")"
 
 register_workload() {
   local name="$1"
@@ -32,3 +34,5 @@ register_workload frontend
 register_workload orders-api
 register_workload payment-api
 register_workload admin-api
+
+unset PARENT_ID
