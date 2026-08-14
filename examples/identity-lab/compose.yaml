@@ -1,0 +1,46 @@
+name: workload-trust-identity-lab
+
+x-spiffe-probe: &spiffe-probe
+  image: ghcr.io/spiffe/spire-agent:1.15.2
+  entrypoint: ["/opt/spire/bin/spire-agent"]
+  command: ["api", "fetch", "x509", "-socketPath", "/run/spire/agent.sock"]
+  network_mode: none
+  volumes:
+    - "${WTP_SPIRE_SOCKET_DIR:-/tmp/workload-trust-lab}:/run/spire:ro"
+
+services:
+  frontend:
+    <<: *spiffe-probe
+    labels:
+      com.workload-trust.name: frontend
+      com.workload-trust.environment: lab
+
+  orders-api:
+    <<: *spiffe-probe
+    labels:
+      com.workload-trust.name: orders-api
+      com.workload-trust.environment: lab
+
+  payment-api:
+    <<: *spiffe-probe
+    labels:
+      com.workload-trust.name: payment-api
+      com.workload-trust.environment: lab
+
+  admin-api:
+    <<: *spiffe-probe
+    labels:
+      com.workload-trust.name: admin-api
+      com.workload-trust.environment: lab
+
+  untrusted:
+    <<: *spiffe-probe
+    labels:
+      com.workload-trust.name: untrusted
+      com.workload-trust.environment: lab
+
+  frontend-wrong-environment:
+    <<: *spiffe-probe
+    labels:
+      com.workload-trust.name: frontend
+      com.workload-trust.environment: dev
