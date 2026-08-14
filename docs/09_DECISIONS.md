@@ -9,6 +9,7 @@ Date: 2026-08-14
 | ADR-0002 | SPIFFE/SPIRE for workload identity | Accepted |
 | ADR-0003 | Modular control plane for V1, not microservices | Accepted |
 | ADR-0004 | PostgreSQL as product-state source of truth | Accepted |
+| ADR-0005 | Host-native SPIRE + Docker-label attestation for Phase 1 lab | Accepted |
 
 ## Product decisions
 
@@ -18,5 +19,13 @@ Date: 2026-08-14
 - X.509-SVID is the primary V1 workload authentication mechanism.
 - Authorization is deterministic and default-deny.
 - Custom cryptography is prohibited.
+
+## Phase 1 lab decisions
+
+- SPIRE lab runtime is pinned to v1.15.2 and release archives are SHA-256 verified before use.
+- Lab trust domain is `workload-trust.test`.
+- The local lab agent uses a one-time join token and `insecure_bootstrap`; neither is a production bootstrap claim.
+- Docker workload identity in the lab requires both workload-name and environment labels.
+- Phase 1 proves identity issuance and negative attestation cases only; authorization remains a later phase.
 
 See `docs/adr/` for rationale.

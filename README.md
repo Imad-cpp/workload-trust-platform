@@ -19,7 +19,7 @@ A reproducible local environment demonstrates all of the following end to end:
 3. Allowed service-to-service calls succeed over mutually authenticated TLS.
 4. Disallowed calls fail closed.
 5. Identity and policy lifecycle events are visible through an operator control plane and audit trail.
-6. Restarted workloads obtain fresh identity material without reusing long-lived application secrets.
+6. Restarted workloads recover short-lived identity through attestation without reusing long-lived application secrets.
 7. The complete security-critical path is covered by automated integration and failure tests.
 
 ## Planned technology
@@ -44,9 +44,13 @@ Start with:
 - [`docs/08_DEFINITION_OF_DONE.md`](docs/08_DEFINITION_OF_DONE.md)
 - [`docs/09_DECISIONS.md`](docs/09_DECISIONS.md)
 - [`docs/11_OPEN_QUESTIONS.md`](docs/11_OPEN_QUESTIONS.md)
+- [`docs/13_IDENTITY_LAB.md`](docs/13_IDENTITY_LAB.md)
+- [`docs/14_PHASE1_EVIDENCE.md`](docs/14_PHASE1_EVIDENCE.md)
 
 ## Current status
 
-**Phase 0 — Product, architecture and security foundation.**
+**Phase 1 complete — SPIFFE/SPIRE Docker workload identity foundation.**
+
+The repository now has automated evidence for real Docker workload attestation, positive and negative identity cases, restart/re-attestation behavior, and short-lived X.509-SVID rotation. Service-to-service authorization, the Go control plane, PostgreSQL integration, and the operator console remain future phases.
 
 No production-readiness claim is made. No custom cryptographic primitive is planned.

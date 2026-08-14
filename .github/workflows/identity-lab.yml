@@ -1,0 +1,40 @@
+name: SPIRE Identity Lab
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spire-config:
+    name: SPIRE config validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch verified SPIRE release
+        run: ./scripts/fetch-spire.sh
+
+      - name: Validate SPIRE server config
+        run: ./.lab/bin/spire-server validate -config deploy/spire/server.conf
+
+      - name: Validate SPIRE agent config
+        run: ./.lab/bin/spire-agent validate -config deploy/spire/agent.conf
+
+  docker-attestation:
+    name: Docker workload attestation
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run real SPIRE identity lab
+        run: ./scripts/lab-ci.sh

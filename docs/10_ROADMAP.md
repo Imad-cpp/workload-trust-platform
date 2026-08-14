@@ -3,7 +3,9 @@
 Status: Directional  
 Date: 2026-08-14
 
-## Phase 0 — Foundation
+## Phase 0 — Foundation ✅
+
+Completed on main:
 
 - product source of truth;
 - V1/non-V1;
@@ -15,18 +17,27 @@ Date: 2026-08-14
 - data model;
 - API boundaries;
 - ADRs;
-- Definition of Done.
+- Definition of Done;
+- foundation CI validation.
 
-Exit: architecture is internally consistent enough to scaffold without inventing trust semantics during coding.
+## Phase 1 — SPIFFE/SPIRE identity lab ✅
 
-## Phase 1 — SPIFFE/SPIRE identity lab
+Completed/evidenced in the Phase 1 implementation:
 
 - reproducible SPIRE Server/Agent environment;
-- Docker/Linux attestation experiment;
-- four demo workloads;
-- X.509-SVID retrieval and rotation;
-- negative identity tests;
-- selector/registration ADR.
+- verified upstream SPIRE v1.15.2 release download;
+- Docker/Linux attestation using runtime Docker selectors;
+- four registered demo workload identities;
+- positive X.509-SVID retrieval tests;
+- unregistered and wrong-selector negative tests;
+- asynchronous authorized-entry synchronization handled deterministically;
+- workload recreation/re-attestation across distinct Docker containers;
+- automatic short-lived X.509-SVID rotation observed through the streaming Workload API;
+- Docker locator failure diagnostics and CI log redaction;
+- selector/bootstrap limitations documented in the threat model and ADR;
+- real identity runtime executed by permanent CI.
+
+Phase 1 establishes identity only. It does not claim service authorization, production-grade node attestation, or production readiness.
 
 ## Phase 2 — Go control plane
 

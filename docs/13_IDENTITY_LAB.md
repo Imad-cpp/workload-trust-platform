@@ -1,0 +1,161 @@
+# 13 — SPIFFE/SPIRE Identity Lab
+
+Status: Phase 1 complete  
+Date: 2026-08-14
+
+## Purpose
+
+The identity lab proves the first security-critical product invariant with a real SPIRE runtime:
+
+> a Docker workload receives a SPIFFE identity only when runtime-derived selectors match an operator-created registration entry.
+
+This phase does **not** implement service authorization or mTLS policy enforcement. Those belong to later phases.
+
+## Runtime shape
+
+SPIRE Server and SPIRE Agent run directly on the Linux host. Demo workload probes run as Docker containers and connect only to the local SPIFFE Workload API Unix socket.
+
+```text
+Linux host
+├── SPIRE Server
+├── SPIRE Agent
+│   ├── Docker WorkloadAttestor
+│   ├── /var/run/docker.sock
+│   └── /tmp/workload-trust-lab/agent.sock
+└── Docker workload probes
+    ├── frontend
+    ├── orders-api
+    ├── payment-api
+    ├── admin-api
+    ├── untrusted
+    └── frontend-wrong-environment
+```
+
+The host-native agent is intentional for this lab: it gives the Docker WorkloadAttestor direct access to the host process/cgroup view and Docker Engine API without creating a nested container trust boundary just to run the attestor.
+
+## Trust domain
+
+The lab uses:
+
+```text
+workload-trust.test
+```
+
+The `.test` top-level domain is reserved for testing. This is a lab naming decision, not a final product/company domain.
+
+## Agent bootstrap
+
+The lab uses the SPIRE `join_token` NodeAttestor. SPIRE assigns the attested agent an ID in its reserved join-token namespace:
+
+```text
+spiffe://workload-trust.test/spire/agent/join_token/<one-time-token>
+```
+
+The token is one-time-use. Because SPIRE embeds that consumed token value in the agent SPIFFE ID for this attestor, the lab stores the resulting parent ID only in ignored ephemeral `.lab/agent-id` state and does not print or commit it.
+
+The agent config also uses `insecure_bootstrap = true` **only for the local lab** to bootstrap trust in the local SPIRE Server. This is explicitly not a production node-attestation/bootstrap design.
+
+## Workload selectors
+
+Each registered workload requires two Docker-label selectors:
+
+```text
+docker:label:com.workload-trust.name:<workload>
+docker:label:com.workload-trust.environment:lab
+```
+
+Example:
+
+```text
+docker:label:com.workload-trust.name:frontend
+docker:label:com.workload-trust.environment:lab
+```
+
+Expected identity:
+
+```text
+spiffe://workload-trust.test/lab/frontend
+```
+
+Labels are appropriate for proving Docker workload-attestation mechanics in a controlled lab. They are **not** claimed as a sufficient high-assurance production selector if an attacker controls Docker workload creation and can freely choose labels. Stronger production attestation is a later design problem.
+
+## Entry synchronization
+
+Workload registration entries are created through the SPIRE Server and reach the Agent asynchronously. SPIRE's current default authorized-entry sync interval is 5 seconds. The verification script therefore polls the real Workload API for up to 15 seconds for the first positive identity instead of using a brittle fixed sleep. A timeout fails the test; it never converts an unknown state into success.
+
+The lab keeps Docker container-locator diagnostics enabled at DEBUG level. CI only emits the tail of these diagnostics when a run fails, and redacts join-token values embedded in SPIRE agent IDs before printing them.
+
+## X.509-SVID lifecycle test
+
+Lab registration entries use a deliberately short **12-second X.509-SVID TTL** so lifecycle behavior can be proven inside CI without weakening any production configuration (there is no production configuration yet).
+
+The lifecycle verification has two distinct checks:
+
+1. **Restart/re-issuance:** two separate one-off Docker containers with the same trusted labels must independently obtain the same logical SPIFFE ID. Their Docker container IDs must differ. This proves identity is recovered from attestation rather than a credential copied into the workload image.
+2. **Rotation:** one long-running `spire-agent api watch` probe remains attached to the Workload API. CI requires at least two X.509 context updates for the expected SPIFFE ID with distinct `SVID Valid Until` timestamps before the rotation timeout expires. The CLI prints validity metadata only; no workload private key is written or printed by this test.
+
+## Positive tests
+
+The lab proves all four expected identities:
+
+| Container | Expected SPIFFE ID |
+|---|---|
+| frontend | `spiffe://workload-trust.test/lab/frontend` |
+| orders-api | `spiffe://workload-trust.test/lab/orders-api` |
+| payment-api | `spiffe://workload-trust.test/lab/payment-api` |
+| admin-api | `spiffe://workload-trust.test/lab/admin-api` |
+
+## Negative tests
+
+Two negative probes are release-blocking for this phase:
+
+1. `untrusted`: valid lab environment label but no registered workload name.
+2. `frontend-wrong-environment`: valid frontend name but `environment=dev`, proving the two selectors are conjunctive rather than accepting a partial match.
+
+Neither may receive any registered `spiffe://workload-trust.test/lab/...` identity.
+
+## Supply-chain pinning
+
+`scripts/fetch-spire.sh` downloads SPIRE `v1.15.2` release archives and verifies the upstream release SHA-256 before installing the binaries into `.lab/bin`.
+
+Supported lab architectures:
+
+- Linux amd64
+- Linux arm64
+
+The `.lab` directory is ignored by Git and contains ephemeral binaries, state, logs and private identity runtime material.
+
+## Run locally
+
+Requirements:
+
+- Linux;
+- Docker Engine + Compose plugin;
+- `curl`, `tar`, `sha256sum`, standard POSIX/Linux shell tools;
+- permission to access `/var/run/docker.sock`.
+
+Run:
+
+```bash
+./scripts/lab-up.sh
+./scripts/lab-register.sh
+./scripts/lab-verify.sh
+./scripts/lab-down.sh
+```
+
+Or execute the CI-equivalent lifecycle:
+
+```bash
+./scripts/lab-ci.sh
+```
+
+## Security boundaries
+
+- no workload private key is copied into the repository or host application database;
+- workload probes use the local Workload API socket;
+- the lab containers run with `network_mode: none` because identity retrieval requires no application network access;
+- lifecycle tests inspect SPIFFE IDs and certificate validity timestamps, not private-key material;
+- the join token and generated parent identity are kept out of committed files and normal success output;
+- CI diagnostic logs redact join-token values embedded in agent SPIFFE IDs;
+- runtime state is ephemeral and excluded from Git;
+- authorization has not been implemented yet, so a successful SVID must not be described as permission to call another service.

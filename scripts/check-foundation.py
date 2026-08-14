@@ -26,10 +26,13 @@ REQUIRED_FILES = [
     "docs/10_ROADMAP.md",
     "docs/11_OPEN_QUESTIONS.md",
     "docs/12_DATA_MODEL.md",
+    "docs/13_IDENTITY_LAB.md",
+    "docs/14_PHASE1_EVIDENCE.md",
     "docs/adr/0001-go-core.md",
     "docs/adr/0002-spiffe-spire.md",
     "docs/adr/0003-modular-control-plane.md",
     "docs/adr/0004-postgresql-source-of-truth.md",
+    "docs/adr/0005-v1-lab-attestation.md",
 ]
 
 REQUIRED_PHRASES = {
@@ -46,6 +49,20 @@ REQUIRED_PHRASES = {
     "docs/05_POLICY_MODEL.md": ["ALLOW", "DENY"],
     "docs/07_V1_SCOPE.md": ["Docker", "Linux"],
     "docs/08_DEFINITION_OF_DONE.md": ["security", "test"],
+    "docs/13_IDENTITY_LAB.md": [
+        "Phase 1 complete",
+        "workload-trust.test",
+        "Docker workload-attestation",
+        "insecure_bootstrap",
+        "12-second X.509-SVID TTL",
+        "not a production",
+    ],
+    "docs/14_PHASE1_EVIDENCE.md": [
+        "Docker workload attestation",
+        "automatic SVID rotation",
+        "does not prove service authorization",
+    ],
+    "docs/adr/0005-v1-lab-attestation.md": ["host-native SPIRE", "Docker-label attestation"],
 }
 
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -92,7 +109,13 @@ def check_readme_claim_boundary() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     required = "No production-readiness claim is made."
     if required not in readme:
-        fail(f"README.md must keep the Phase 0 claim boundary: {required}")
+        fail(f"README.md must keep the claim boundary: {required}")
+
+
+def check_ephemeral_runtime_ignored() -> None:
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    if ".lab/" not in {line.strip() for line in gitignore}:
+        fail(".gitignore must exclude .lab/ because SPIRE runtime material is ephemeral and sensitive")
 
 
 def main() -> None:
@@ -100,6 +123,7 @@ def main() -> None:
     check_required_phrases()
     check_local_markdown_links()
     check_readme_claim_boundary()
+    check_ephemeral_runtime_ignored()
     print(f"foundation validation passed: {len(REQUIRED_FILES)} required files")
 
 
