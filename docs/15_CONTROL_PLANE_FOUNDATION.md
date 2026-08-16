@@ -5,7 +5,7 @@ Date: 2026-08-16
 
 ## Purpose
 
-The Phase 2 control plane now includes authenticated/authorized local management reads, transactionally audited registration desired-state mutations, versioned policy management/activation, and an internal SPIRE desired-state reconciler. Remote management remains closed.
+The Phase 2 control plane now includes authenticated/authorized local management reads, transactionally audited registration desired-state mutations, versioned policy management/activation, safe aggregate diagnostics, a local read-only CLI, and an internal SPIRE desired-state reconciler. Remote management remains closed.
 
 It establishes:
 
@@ -15,14 +15,16 @@ It establishes:
 - loopback-only `/v1/*` bearer authentication;
 - fail-closed local `viewer`/`operator` permission checks;
 - authenticated workload reads;
+- aggregate `diagnostics:read` status without sensitive rule/audit payloads;
 - authorized registration desired-state POST/PATCH with optimistic revisions and atomic audit;
 - authorized policy create/version/activation routes with distinct activation permission;
 - immutable policy versions and optimistic policy envelope revisions;
 - canonical SPIFFE policy validation, stored-version revalidation and atomic activation audit;
+- local read-only `wtpctl` through the existing management API, with no direct PostgreSQL dependency;
 - registration reconciliation state and ownership-safe SPIRE v1.15.2 Entry API integration;
-- real PostgreSQL, live HTTP and real SPIRE permanent CI.
+- real PostgreSQL, live HTTP, CLI and real SPIRE permanent CI.
 
-It does not complete Phase 2. CLI diagnostics, consolidated control-plane security/failure review and Phase 2 exit evidence remain future work. Workload service authorization remains Phase 3.
+It does not complete Phase 2. Consolidated control-plane security/failure review, the local-principal decision and Phase 2 exit evidence remain future work. Workload service authorization remains Phase 3.
 
 ## Operator runtime
 
@@ -46,6 +48,7 @@ Missing role defaults to `viewer`.
 - `GET /healthz` — generic liveness;
 - `GET /readyz` — generic PostgreSQL readiness;
 - `GET /v1/workloads?organization_id=<uuid>` — authenticated/authorized inventory;
+- `GET /v1/diagnostics?organization_id=<uuid>` — aggregate status with `diagnostics:read`;
 - `POST /v1/registration-rules` — requires `registrations:write`;
 - `PATCH /v1/registration-rules/{id}` — full desired-state replacement requiring `expected_revision` and `registrations:write`;
 - `POST /v1/policies` — creates draft policy + immutable version 1 with `policies:write`;
@@ -54,7 +57,24 @@ Missing role defaults to `viewer`.
 
 No workload mutation route exists. Registration/policy routes change PostgreSQL management state only. They do not directly enforce workload access.
 
+The diagnostics route returns aggregate workload/registration/policy/audit/security counts and latest audit time. It omits selectors, parent identity, policy rule identity/change reason, audit metadata and credentials.
+
 The local role model is still one configured principal per process, not a remote/multi-user session/RBAC platform.
+
+## Local CLI
+
+Entrypoint: `apps/wtpctl/main.go`
+
+```text
+wtpctl health
+wtpctl ready
+wtpctl workloads --organization-id <uuid>
+wtpctl status --organization-id <uuid>
+```
+
+`wtpctl` is an HTTP client of the loopback management API; it does not use `DATABASE_URL`. `WTP_API_URL` is restricted to local plain HTTP, redirects are refused, authenticated commands use the existing bearer token, requests time out after five seconds and responses over 1 MiB are rejected without partial output.
+
+`status` uses the aggregate diagnostics route. `workloads` intentionally exposes the existing authorized workload inventory, including workload SPIFFE IDs.
 
 ## Transactional management boundary
 
@@ -100,6 +120,8 @@ PostgreSQL migrations 000001 -> 000002 -> 000003 -> rollback -> re-apply
 real PostgreSQL repositories and forced atomic-audit rollback tests
 live registration management: 401 / 403 / 201 / 200 / 409
 live policy management: 401 / 403 / 201 / 201 / 409 / 200 / foreign 404
+live CLI diagnostics: health / ready / status / workloads / wrong-token / non-loopback refusal
+CLI status leak checks + no direct DB credential dependency + read-only audit-count proof
 SPIRE identity regression lab
 PostgreSQL desired registration state -> SPIRE create/update/delete
 foreign matching SPIRE entry -> ownership refusal
@@ -111,6 +133,7 @@ foreign matching SPIRE entry -> ownership refusal
 - authentication and server-side role authorization protect current `/v1/*` management routes;
 - registration and policy state/audit mutations are atomic and attributable;
 - health/readiness remain unauthenticated and generic;
+- CLI inspection remains local/read-only and does not bypass the API for database access;
 - SPIRE management access remains local and highly privileged;
 - internal database/repository errors are not reflected verbatim;
 - credentials and workload private keys are not intentionally logged/stored by product state;
@@ -128,6 +151,16 @@ export WTP_OPERATOR_ROLE='viewer'
 export WTP_OPERATOR_TOKEN="$(openssl rand -hex 32)"
 go run ./apps/control-plane
 ```
+
+In another local shell, reuse only the management URL/token needed by the CLI:
+
+```bash
+export WTP_API_URL='http://127.0.0.1:8080'
+export WTP_OPERATOR_TOKEN='<same-local-bearer-token>'
+go run ./apps/wtpctl status --organization-id '<organization-uuid>'
+```
+
+The CLI does not require `DATABASE_URL`.
 
 Use `WTP_OPERATOR_ROLE=operator` only when local registration/policy management write permission is intended.
 
