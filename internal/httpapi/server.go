@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
+	"github.com/Imad-cpp/workload-trust-platform/internal/policy"
 	"github.com/Imad-cpp/workload-trust-platform/internal/registration"
 	"github.com/Imad-cpp/workload-trust-platform/internal/workload"
 )
@@ -25,6 +26,7 @@ type Dependencies struct {
 	Readiness             ReadinessChecker
 	Workloads             workload.Lister
 	RegistrationMutations registration.Mutator
+	PolicyManager         policy.Manager
 	Authenticator         operatorauth.Authenticator
 	Authorizer            operatorauth.Authorizer
 }
@@ -33,6 +35,7 @@ type Server struct {
 	readiness             ReadinessChecker
 	workloads             workload.Lister
 	registrationMutations registration.Mutator
+	policyManager         policy.Manager
 	authenticator         operatorauth.Authenticator
 	authorizer            operatorauth.Authorizer
 	handler               http.Handler
@@ -62,6 +65,9 @@ func New(deps Dependencies) (*Server, error) {
 	if deps.RegistrationMutations == nil {
 		return nil, errors.New("registration mutation service is required")
 	}
+	if deps.PolicyManager == nil {
+		return nil, errors.New("policy manager is required")
+	}
 	if deps.Authenticator == nil {
 		return nil, errors.New("operator authenticator is required")
 	}
@@ -73,6 +79,7 @@ func New(deps Dependencies) (*Server, error) {
 		readiness:             deps.Readiness,
 		workloads:             deps.Workloads,
 		registrationMutations: deps.RegistrationMutations,
+		policyManager:         deps.PolicyManager,
 		authenticator:         deps.Authenticator,
 		authorizer:            deps.Authorizer,
 	}
@@ -81,6 +88,9 @@ func New(deps Dependencies) (*Server, error) {
 	apiMux.Handle("/v1/workloads", s.requirePermission(operatorauth.PermissionWorkloadsRead, getOnly(s.listWorkloads)))
 	apiMux.Handle("POST /v1/registration-rules", s.requirePermission(operatorauth.PermissionRegistrationsWrite, http.HandlerFunc(s.createRegistrationRule)))
 	apiMux.Handle("PATCH /v1/registration-rules/{id}", s.requirePermission(operatorauth.PermissionRegistrationsWrite, http.HandlerFunc(s.replaceRegistrationRule)))
+	apiMux.Handle("POST /v1/policies", s.requirePermission(operatorauth.PermissionPoliciesWrite, http.HandlerFunc(s.createPolicy)))
+	apiMux.Handle("POST /v1/policies/{id}/versions", s.requirePermission(operatorauth.PermissionPoliciesWrite, http.HandlerFunc(s.appendPolicyVersion)))
+	apiMux.Handle("POST /v1/policies/{id}/activate", s.requirePermission(operatorauth.PermissionPoliciesActivate, http.HandlerFunc(s.activatePolicy)))
 	apiMux.HandleFunc("/", s.notFound)
 
 	rootMux := http.NewServeMux()
