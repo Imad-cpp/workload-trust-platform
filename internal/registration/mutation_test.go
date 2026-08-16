@@ -5,6 +5,24 @@ import (
 	"testing"
 )
 
+func TestValidateActorRequiresWriteOperator(t *testing.T) {
+	cases := []MutationActor{
+		{Type: "operator", ID: "local-viewer", Role: "viewer"},
+		{Type: "operator", ID: "local-admin", Role: ""},
+		{Type: "service", ID: "local-admin", Role: "operator"},
+		{Type: "operator", ID: "", Role: "operator"},
+	}
+	for _, actor := range cases {
+		if err := validateActor(actor); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("validateActor(%#v) error = %v, want ErrInvalidInput", actor, err)
+		}
+	}
+
+	if err := validateActor(MutationActor{Type: "operator", ID: "local-admin", Role: "operator"}); err != nil {
+		t.Fatalf("valid operator rejected: %v", err)
+	}
+}
+
 func TestValidateDesiredFieldsRejectsUnsafeInputs(t *testing.T) {
 	validParent := "spiffe://workload-trust.test/spire/agent/test"
 	cases := []struct {
@@ -20,6 +38,10 @@ func TestValidateDesiredFieldsRejectsUnsafeInputs(t *testing.T) {
 		{name: "control character", state: "present", selectors: []string{"docker:label:service:api\nadmin"}, parent: validParent, ttl: 300},
 		{name: "non spiffe parent", state: "present", selectors: []string{"docker:label:service:api"}, parent: "https://example.test/agent", ttl: 300},
 		{name: "uppercase trust domain", state: "present", selectors: []string{"docker:label:service:api"}, parent: "spiffe://EXAMPLE.test/agent", ttl: 300},
+		{name: "empty path segment", state: "present", selectors: []string{"docker:label:service:api"}, parent: "spiffe://workload-trust.test/spire//agent", ttl: 300},
+		{name: "dot path segment", state: "present", selectors: []string{"docker:label:service:api"}, parent: "spiffe://workload-trust.test/spire/./agent", ttl: 300},
+		{name: "dotdot path segment", state: "present", selectors: []string{"docker:label:service:api"}, parent: "spiffe://workload-trust.test/spire/../agent", ttl: 300},
+		{name: "trailing slash", state: "present", selectors: []string{"docker:label:service:api"}, parent: "spiffe://workload-trust.test/spire/agent/", ttl: 300},
 		{name: "ttl too short", state: "present", selectors: []string{"docker:label:service:api"}, parent: validParent, ttl: 59},
 	}
 	for _, tc := range cases {
