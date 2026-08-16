@@ -66,19 +66,34 @@ func TestPostgresReaderSummarizesOrganization(t *testing.T) {
 		) VALUES (
 			$1::uuid, $2::uuid, '["docker:label:service:frontend"]'::jsonb,
 			'spiffe://diagnostics.test/spire/agent/test', 300, 'pending'
-		);
+		)
+	`, organizationID, workloadID); err != nil {
+		t.Fatalf("insert registration rule: %v", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO access_policies (organization_id, name, status)
-		VALUES ($1::uuid, 'frontend-to-orders', 'active');
+		VALUES ($1::uuid, 'frontend-to-orders', 'active')
+	`, organizationID); err != nil {
+		t.Fatalf("insert access policy: %v", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO audit_events (
 			organization_id, actor_type, actor_id, action, target_type, target_id, correlation_id, metadata
 		) VALUES (
 			$1::uuid, 'operator', 'diagnostics-test', 'diagnostics.seeded', 'organization', $1, 'diag-1', '{}'::jsonb
-		);
+		)
+	`, organizationID); err != nil {
+		t.Fatalf("insert audit event: %v", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
 		INSERT INTO security_events (
 			organization_id, event_type, severity, reason_code, correlation_id, metadata
-		) VALUES ($1::uuid, 'diagnostics-test', 'info', 'seeded', 'diag-1', '{}'::jsonb);
-	`, organizationID, workloadID); err != nil {
-		t.Fatalf("seed diagnostics state: %v", err)
+		) VALUES ($1::uuid, 'diagnostics-test', 'info', 'seeded', 'diag-1', '{}'::jsonb)
+	`, organizationID); err != nil {
+		t.Fatalf("insert security event: %v", err)
 	}
 
 	summary, err := NewPostgresReader(tx).SummaryByOrganization(ctx, organizationID)
@@ -87,6 +102,9 @@ func TestPostgresReaderSummarizesOrganization(t *testing.T) {
 	}
 	if summary.OrganizationID != organizationID || summary.WorkloadsTotal != 1 || summary.WorkloadsHealthy != 1 {
 		t.Fatalf("unexpected workload diagnostics: %#v", summary)
+	}
+	if summary.WorkloadsUnknown != 0 || summary.WorkloadsDegraded != 0 || summary.WorkloadsOffline != 0 || summary.WorkloadsDisabled != 0 {
+		t.Fatalf("unexpected non-healthy workload counts: %#v", summary)
 	}
 	if summary.RegistrationsPending != 1 || summary.PoliciesActive != 1 || summary.AuditEvents != 1 || summary.SecurityEvents != 1 {
 		t.Fatalf("unexpected state diagnostics: %#v", summary)
