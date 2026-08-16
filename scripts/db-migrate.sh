@@ -29,8 +29,14 @@ case "${DIRECTION}" in
     if ! has_column registration_rules parent_spiffe_id; then
       psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${ROOT}/db/migrations/000002_registration_reconciliation.up.sql"
     fi
+    if ! has_column access_policies revision; then
+      psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${ROOT}/db/migrations/000003_policy_revision.up.sql"
+    fi
     ;;
   down)
+    if has_column access_policies revision; then
+      psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${ROOT}/db/migrations/000003_policy_revision.down.sql"
+    fi
     if has_column registration_rules parent_spiffe_id; then
       psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${ROOT}/db/migrations/000002_registration_reconciliation.down.sql"
     fi
