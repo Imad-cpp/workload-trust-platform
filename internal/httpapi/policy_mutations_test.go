@@ -15,16 +15,16 @@ import (
 )
 
 type policyHTTPManagerStub struct {
-	createResult policy.CreateResult
-	createErr    error
-	appendResult policy.VersionResult
-	appendErr    error
-	activateResult policy.PolicyResult
-	activateErr    error
-	createCalls  int
-	appendCalls  int
-	activateCalls int
-	lastActor    policy.MutationActor
+	createResult    policy.CreateResult
+	createErr       error
+	appendResult    policy.VersionResult
+	appendErr       error
+	activateResult  policy.PolicyResult
+	activateErr     error
+	createCalls     int
+	appendCalls     int
+	activateCalls   int
+	lastActor       policy.MutationActor
 	lastCorrelation string
 }
 
