@@ -9,13 +9,19 @@ import (
 const testToken = "0123456789abcdef0123456789abcdef"
 
 func TestNewStaticBearerRejectsShortToken(t *testing.T) {
-	if _, err := NewStaticBearer("too-short", "local-admin"); err == nil {
+	if _, err := NewStaticBearer("too-short", "local-admin", RoleViewer); err == nil {
 		t.Fatal("expected short token to be rejected")
 	}
 }
 
+func TestNewStaticBearerRejectsInvalidRole(t *testing.T) {
+	if _, err := NewStaticBearer(testToken, "local-admin", Role("admin")); err == nil {
+		t.Fatal("expected unknown role to be rejected")
+	}
+}
+
 func TestStaticBearerAuthenticatesExactToken(t *testing.T) {
-	auth, err := NewStaticBearer(testToken, "local-admin")
+	auth, err := NewStaticBearer(testToken, "local-admin", RoleOperator)
 	if err != nil {
 		t.Fatalf("NewStaticBearer() error = %v", err)
 	}
@@ -26,13 +32,13 @@ func TestStaticBearerAuthenticatesExactToken(t *testing.T) {
 	if !ok {
 		t.Fatal("expected valid bearer token to authenticate")
 	}
-	if principal.ActorType != "operator" || principal.ActorID != "local-admin" {
+	if principal.ActorType != "operator" || principal.ActorID != "local-admin" || principal.Role != RoleOperator {
 		t.Fatalf("unexpected principal: %#v", principal)
 	}
 }
 
 func TestStaticBearerRejectsMalformedOrWrongCredentials(t *testing.T) {
-	auth, err := NewStaticBearer(testToken, "local-admin")
+	auth, err := NewStaticBearer(testToken, "local-admin", RoleViewer)
 	if err != nil {
 		t.Fatalf("NewStaticBearer() error = %v", err)
 	}

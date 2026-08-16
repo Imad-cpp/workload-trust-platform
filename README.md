@@ -4,7 +4,7 @@
 
 Workload Trust Platform is a security infrastructure product for giving software workloads verifiable identities and enforcing least-privilege service-to-service access without long-lived workload credentials.
 
-The V1 direction combines SPIFFE/SPIRE workload identity, a Go control plane, PostgreSQL product state, deterministic authorization, and an operator console. The implementation is staged so identity, control-plane trust and authorization claims are proven separately.
+The V1 direction combines SPIFFE/SPIRE workload identity, a Go control plane, PostgreSQL product state, deterministic authorization and an operator console. Identity, management control and workload authorization claims are proved in separate stages.
 
 ## Product mission
 
@@ -18,26 +18,28 @@ Permanent CI proves real Docker workload attestation, expected SPIFFE IDs, negat
 
 ### Phase 2 — control plane 🚧
 
-Implemented slices now include:
+Implemented/evidenced slices include:
 
-- Go control-plane and one-shot reconciler processes;
-- PostgreSQL schema/migrations and real repository integration tests;
-- authenticated, still-loopback-only `/v1/*` reads with an explicit local operator principal;
-- read-only workload inventory;
-- append-only audit primitives and access-policy versions;
-- registration-rule desired state, SPIRE entry binding and convergence/error state;
-- official SPIRE v1.15.2 Entry API integration over the local Unix management socket;
-- ownership-safe create/update/delete reconciliation and drift repair;
-- permanent real PostgreSQL-to-SPIRE-to-Workload-API lifecycle CI.
+- Go control-plane and one-shot SPIRE reconciler;
+- PostgreSQL schema/migrations, real repository tests and append-only security history;
+- loopback-only high-entropy bearer authentication;
+- fail-closed local `viewer` / `operator` management permissions;
+- authenticated workload inventory;
+- server-authorized registration desired-state `POST`/`PATCH`;
+- strict 64 KiB JSON mutation boundary, optimistic revision protection and generic errors;
+- registration mutation + operator audit in one PostgreSQL transaction;
+- official SPIRE v1.15.2 Entry API reconciliation over the local Unix socket;
+- ownership-safe SPIRE create/update/delete, drift repair and foreign-entry refusal;
+- permanent real SPIRE reconciliation and live operator-mutation CI.
 
-The HTTP surface still has **no mutation endpoint**, no remote listener and no multi-role operator authorization model. Service authorization/mTLS enforcement is Phase 3 work.
+The current role model is still one configured local principal, not remote/multi-user enterprise RBAC. Policy activation and service-to-service authorization are not implemented yet.
 
 ## Technology
 
-- Go — control plane, reconciler, CLI/policy/infrastructure integrations
+- Go — control plane, reconciler, future CLI/policy/enforcement integrations
 - Next.js + React + TypeScript — planned operator console
 - PostgreSQL — product configuration and audit source of truth
-- SPIFFE / SPIRE — workload identity standard and runtime
+- SPIFFE / SPIRE — workload identity standard/runtime
 - Docker / Linux — V1 reference environment
 - GitHub Actions — quality, security and release evidence
 
@@ -57,6 +59,7 @@ Start with:
 - [`docs/14_PHASE1_EVIDENCE.md`](docs/14_PHASE1_EVIDENCE.md)
 - [`docs/15_CONTROL_PLANE_FOUNDATION.md`](docs/15_CONTROL_PLANE_FOUNDATION.md)
 - [`docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md`](docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md)
+- [`docs/17_OPERATOR_MUTATION_EVIDENCE.md`](docs/17_OPERATOR_MUTATION_EVIDENCE.md)
 
 ## Local control-plane development
 
@@ -65,19 +68,24 @@ docker compose -f deploy/dev/compose.yaml up -d postgres
 export DATABASE_URL='postgres://workload_trust:local-development-only@127.0.0.1:5432/workload_trust?sslmode=disable'
 ./scripts/db-migrate.sh up
 export WTP_OPERATOR_ID='local-admin'
+export WTP_OPERATOR_ROLE='viewer'
 export WTP_OPERATOR_TOKEN="$(openssl rand -hex 32)"
 go run ./apps/control-plane
 ```
 
-The example database credentials are local-development-only values. No production deployment or production-readiness claim is made.
+Set `WTP_OPERATOR_ROLE=operator` only for a local principal that should be allowed to change registration desired state.
+
+No production deployment or production-readiness claim is made.
 
 ## Current security boundary
 
 - no custom cryptographic primitive;
 - no workload private-key storage in the product database;
-- operator HTTP remains loopback-only;
+- management HTTP remains loopback-only;
 - `/v1/*` requires a local high-entropy bearer credential;
-- no HTTP mutation API yet;
+- registration writes additionally require `registrations:write`;
+- missing role defaults to `viewer`; unknown roles fail closed;
+- registration state + audit are transactionally coupled;
+- mutation responses/audits do not echo desired parent/selector values;
 - SPIRE reconciliation refuses foreign entries by explicit ownership marker/binding checks;
-- ownership hints are not cryptographic proof against privileged administrators;
-- no service authorization claim until Phase 3.
+- no workload service-authorization claim until Phase 3.

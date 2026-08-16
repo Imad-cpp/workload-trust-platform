@@ -5,36 +5,49 @@ Date: 2026-08-14
 
 ## Operator HTTP API — current slice
 
-The management HTTP listener remains **loopback-only**. ADR-0007 adds authentication without opening the listener remotely.
+The management HTTP listener remains **loopback-only**. Every `/v1/*` request requires the configured bearer credential before route-level authorization is evaluated.
 
-Exposed routes:
+Current roles are intentionally small and local:
 
-- `GET /healthz` — process liveness; generic and unauthenticated;
-- `GET /readyz` — PostgreSQL readiness; generic and unauthenticated;
-- `GET /v1/workloads?organization_id=<uuid>` — authenticated organization-scoped workload inventory.
+- `viewer` — read permissions;
+- `operator` — read permissions plus `registrations:write`.
 
-Every `/v1/*` request requires the configured bearer credential. Missing/malformed/incorrect credentials return a stable `401` response with `WWW-Authenticate` metadata. Operator authentication is required before the route is evaluated.
+A missing role defaults to `viewer`; unsupported roles fail closed. This is a single configured local principal with server-side role authorization, not a remote/multi-user session or enterprise RBAC system.
 
-No HTTP mutation endpoint exists in this phase. The current bearer mechanism authenticates a single configured local principal; it is not yet a multi-role operator authorization model.
+### Exposed routes
 
-## HTTP behavior
+- `GET /healthz` — generic process liveness; unauthenticated;
+- `GET /readyz` — generic PostgreSQL readiness; unauthenticated;
+- `GET /v1/workloads?organization_id=<uuid>` — authenticated/authorized workload inventory;
+- `POST /v1/registration-rules` — authenticated + `registrations:write`; create desired registration state;
+- `PATCH /v1/registration-rules/{id}` — authenticated + `registrations:write`; full desired-state replacement with `expected_revision` optimistic concurrency.
 
-- JSON responses for application routes and errors;
-- stable machine-readable error codes;
-- generated request correlation IDs;
-- bounded readiness/repository timeouts;
-- `Cache-Control: no-store`;
-- `X-Content-Type-Options: nosniff`;
-- internal database errors are not reflected to clients;
-- unsupported methods return `405` with `Allow` metadata;
-- unknown `/v1/*` routes require authentication before returning a stable JSON `404`.
+The `PATCH` route is **not** JSON Merge Patch. It replaces the mutable desired-state fields supplied by the API and increments revision only when `expected_revision` still matches.
 
-## SPIRE reconciliation boundary — current slice
+### Mutation request/response behavior
 
-The one-shot reconciler is an internal process boundary, not an HTTP operator mutation route.
+- `application/json` is required;
+- mutation bodies are capped at 64 KiB;
+- unknown JSON fields and trailing JSON values are rejected;
+- parent SPIFFE IDs, selectors and TTL are strictly validated;
+- unauthorized roles are rejected before the mutation service executes;
+- mutation responses contain safe summary fields and do not echo parent SPIFFE IDs or selector values;
+- create returns `201` + `Location`;
+- replacement returns `200`;
+- stale revision returns `409`;
+- internal repository/database errors remain generic.
+
+Each successful registration mutation and its operator audit event commit in the **same PostgreSQL transaction**. An audit failure aborts the desired-state mutation.
+
+## SPIRE reconciliation boundary
+
+Operator HTTP writes only PostgreSQL desired state. SPIRE mutation remains a separate reconciler boundary:
 
 ```text
-PostgreSQL registration desired state
+Authenticated + authorized operator HTTP mutation
+        |
+        v
+PostgreSQL registration desired state + operator audit
         |
         v
 Go reconciler
@@ -46,46 +59,43 @@ SPIRE Server Entry API (local Unix socket)
 SPIRE Agent / Workload API
 ```
 
-Rules:
+Reconciliation rules remain:
 
-- the SPIRE SDK is aligned to v1.15.2 with the reference SPIRE runtime;
-- a registration rule binds to a SPIRE entry ID after convergence;
-- the expected entry hint is `wtp-rule:<registration-rule-id>`;
-- update/delete is refused when the fetched entry is foreign;
-- `ALREADY_EXISTS` is accepted only for an entry carrying the same ownership marker, and desired state is rechecked before convergence;
-- reconciliation failures remain errors rather than implicit success;
-- audit metadata records safe operation/entry evidence and omits parent/selector values.
+- SDK/runtime aligned to SPIRE v1.15.2;
+- managed entry hint `wtp-rule:<registration-rule-id>`;
+- update/delete refused for foreign entries;
+- `ALREADY_EXISTS` adopted only for the exact owned rule and only after full desired-state comparison;
+- reconciliation errors fail rather than becoming implicit success;
+- reconciliation audit metadata omits parent/selector values.
 
-The ownership hint is not a cryptographic ownership proof. It protects against accidental cross-controller mutation inside a trusted local SPIRE management boundary.
+The ownership hint is a non-cryptographic controller convention inside a trusted local SPIRE management boundary.
+
+## HTTP security/error behavior
+
+- generated request correlation IDs;
+- `Cache-Control: no-store`;
+- `X-Content-Type-Options: nosniff`;
+- bounded readiness/repository/mutation timeouts;
+- stable machine-readable errors;
+- missing/bad auth → `401` with `WWW-Authenticate`;
+- authenticated but unauthorized → `403`;
+- invalid JSON/input → `400`;
+- unsupported media type → `415`;
+- oversized mutation body → `413`;
+- revision conflict → `409`;
+- unknown authenticated `/v1/*` route → stable `404`.
 
 ## Future operator resources
 
-Planned mutation/service workflows, not currently exposed as HTTP mutation APIs:
+Still planned:
 
-- organizations;
-- trust domains;
-- workloads/registration rules;
-- policies and versions;
-- audit/security-event inspection.
+- organizations/trust-domain mutation workflows;
+- policy version/activation workflows;
+- audit/security-event inspection APIs;
+- multi-principal/session identity and authorization if/when the management surface expands beyond the local lab.
 
 ## Authorization/enforcement boundary — future Phase 3
 
-Inputs are expected to include:
+Operator authorization above is **management authorization**, not workload service authorization.
 
-- verified source SPIFFE ID;
-- destination identity/resource;
-- requested action;
-- active policy version.
-
-Expected output shape:
-
-```json
-{
-  "decision": "allow|deny",
-  "reason": "stable-machine-readable-code",
-  "policy_version": "...",
-  "correlation_id": "..."
-}
-```
-
-No private key or raw sensitive credential belongs in this API.
+Future service authorization inputs are expected to include verified source SPIFFE ID, destination identity/resource, requested action and active policy version. No private key or raw sensitive credential belongs in that API.

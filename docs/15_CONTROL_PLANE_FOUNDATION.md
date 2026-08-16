@@ -5,137 +5,115 @@ Date: 2026-08-14
 
 ## Purpose
 
-The Phase 2 control plane now includes an authenticated local read boundary and an internal SPIRE desired-state reconciler while keeping remote management and HTTP mutation deliberately closed.
+The Phase 2 control plane now includes authenticated/authorized local management reads, transactionally audited registration desired-state mutations, and an internal SPIRE desired-state reconciler. Remote management remains closed.
 
 It establishes:
 
-- a Go process with structured logging and graceful shutdown;
-- PostgreSQL-backed product state;
-- a read-only workload inventory repository;
-- append-only audit primitives and immutable access-policy history;
-- generic health/readiness endpoints;
-- authenticated `/v1/*` reads for a configured local operator principal;
-- registration reconciliation state and a one-shot SPIRE reconciler;
-- official SPIRE Entry API integration over a local Unix socket;
-- stable JSON HTTP errors/request correlation;
-- real PostgreSQL and real SPIRE integration CI.
+- Go control-plane/reconciler processes with structured logging and bounded shutdown;
+- PostgreSQL product state, append-only audit primitives and immutable policy history;
+- generic health/readiness;
+- loopback-only `/v1/*` bearer authentication;
+- fail-closed local `viewer`/`operator` permission checks;
+- authenticated workload reads;
+- authorized registration desired-state POST/PATCH with strict/bounded JSON validation;
+- optimistic registration revision protection;
+- mutation + operator audit atomicity in PostgreSQL;
+- registration reconciliation state and ownership-safe SPIRE v1.15.2 Entry API integration;
+- real PostgreSQL, live HTTP and real SPIRE permanent CI.
 
-It does not complete Phase 2. Operator authorization beyond the single configured principal, authenticated operator mutation workflows, policy activation workflows, CLI diagnostics and the Phase 2 security/evidence exit remain future work.
+It does not complete Phase 2. Policy activation, CLI diagnostics, consolidated control-plane security/failure review and the Phase 2 exit evidence remain future work.
 
 ## Operator runtime
 
-Entrypoint:
+Entrypoint: `apps/control-plane/main.go`
 
-```text
-apps/control-plane/main.go
-```
+Default listener: `127.0.0.1:8080`. Non-loopback listener values remain rejected.
 
-Default listener:
-
-```text
-127.0.0.1:8080
-```
-
-The process still rejects non-loopback listener addresses.
-
-Required environment:
+Required configuration:
 
 ```text
 DATABASE_URL=postgres://...
 WTP_OPERATOR_ID=local-admin
 WTP_OPERATOR_TOKEN=<at-least-32-bytes-of-high-entropy-secret>
+WTP_OPERATOR_ROLE=viewer|operator
 ```
 
-Optional listener override must remain loopback:
-
-```text
-WTP_LISTEN_ADDR=127.0.0.1:8080
-```
+Missing role defaults to `viewer`.
 
 ## Current HTTP surface
 
-- `GET /healthz` — generic process liveness;
+- `GET /healthz` — generic liveness;
 - `GET /readyz` — generic PostgreSQL readiness;
-- authenticated `GET /v1/workloads?organization_id=<uuid>` — deterministic workload inventory.
+- `GET /v1/workloads?organization_id=<uuid>` — authenticated/authorized inventory;
+- `POST /v1/registration-rules` — requires `registrations:write`;
+- `PATCH /v1/registration-rules/{id}` — full desired-state replacement requiring `expected_revision` and `registrations:write`.
 
-No workload mutation route exists. There is no HTTP mutation endpoint for registration/policy state either.
+No workload mutation route exists. Registration mutation routes now exist, but they only change pending PostgreSQL desired state; they do not call SPIRE directly.
 
-`/v1/*` uses the ADR-0007 bearer authenticator. The configured plaintext credential is not retained by the authenticator after construction; a SHA-256 digest is compared to request credentials using a constant-time fixed-length comparison. This is an interim local high-entropy bearer mechanism, not a password or remote session scheme.
+The local role model is still one configured principal per process, not a remote/multi-user session/RBAC platform.
+
+## Transactional mutation boundary
+
+Registration create/replace operations validate canonical parent SPIFFE IDs, selector shape/count, TTL, JSON media/body shape and a 64 KiB body limit.
+
+Every successful mutation and its attributed operator audit insert commit in the same PostgreSQL transaction. An intentionally failed audit insert is tested to roll back the desired-state mutation. Responses and audit summaries omit parent SPIFFE IDs and selector values.
 
 ## SPIRE reconciliation runtime
 
-Entrypoint:
-
-```text
-apps/reconciler/main.go
-```
-
-Configuration:
+Entrypoint: `apps/reconciler/main.go`
 
 ```text
 DATABASE_URL=postgres://...
 WTP_SPIRE_SERVER_SOCKET=/tmp/workload-trust-lab/server.sock
 ```
 
-The socket path must be absolute. The reconciler reads registration desired state from PostgreSQL and uses the SPIRE v1.15.2 public Entry API to create, update or remove owned entries.
+The reconciler reads pending registration desired state and converges owned SPIRE entries through the v1.15.2 public Entry API over an absolute local Unix socket. `wtp-rule:<rule-id>` plus persisted binding is used as a non-cryptographic ownership convention. Foreign entries fail closed.
 
-Ownership is checked using `wtp-rule:<rule-id>` plus the persisted SPIRE entry binding. Foreign entries fail closed. The marker is a controller convention, not cryptographic proof against a privileged SPIRE administrator.
+## PostgreSQL schema/history
 
-## PostgreSQL schema
+`000001_control_plane` defines core product/history state. `000002_registration_reconciliation` adds parent identity, TTL, SPIRE binding, convergence and error state.
 
-`000001_control_plane` introduces core product state/history tables. `000002_registration_reconciliation` adds parent identity, TTL, SPIRE binding, convergence status/timestamp and stable error-code fields to registration rules.
+`audit_events` and `access_policy_versions` remain append-only at the PostgreSQL layer. Registration operator mutations use existing schema and transactional service semantics rather than a new migration.
 
-`audit_events` and `access_policy_versions` remain append-only at the PostgreSQL layer.
-
-## Evidence
-
-Permanent CI covers:
+## Permanent evidence
 
 ```text
+Foundation validation
 Go module graph / gofmt / vet / race
 PostgreSQL migrate up -> test -> down -> up
-real PostgreSQL repository tests
+real PostgreSQL repositories and atomic-audit rollback
+live operator authz/mutation lifecycle: 401 / 403 / 201 / 200 / 409
 SPIRE identity regression lab
 PostgreSQL desired state -> SPIRE create -> workload SVID
-owned selector/TTL drift -> in-place SPIRE update
-foreign matching SPIRE entry -> ownership refusal
+owned drift -> SPIRE update
+foreign matching entry -> ownership refusal
 owned desired absent -> SPIRE delete -> workload loses identity
-append-only reconciliation audit evidence
 ```
-
-The reconciliation workflow never intentionally prints the ephemeral Phase 1 parent agent SPIFFE ID, which embeds join-token bootstrap material.
 
 ## Security boundaries
 
-- operator HTTP remains loopback-only;
-- `/v1/*` is authenticated but the project does not yet claim a multi-role authorization system;
+- management HTTP remains loopback-only;
+- authentication and server-side role authorization protect current `/v1/*` management routes;
+- registration mutation/audit is atomic and attributable;
 - health/readiness remain unauthenticated and generic;
-- no HTTP mutation endpoint exists;
-- SPIRE management access is local and highly privileged;
-- database/repository errors are not returned verbatim to HTTP clients;
-- database URLs/operator credentials are not intentionally logged;
-- workload private keys are not part of the product schema;
+- SPIRE management access remains local and highly privileged;
+- internal database/repository errors are not reflected verbatim;
+- credentials and workload private keys are not intentionally logged/stored by product state;
 - service authorization and mTLS enforcement remain Phase 3 work.
 
 ## Local development
-
-Start PostgreSQL and apply migrations:
 
 ```bash
 docker compose -f deploy/dev/compose.yaml up -d postgres
 export DATABASE_URL='postgres://workload_trust:local-development-only@127.0.0.1:5432/workload_trust?sslmode=disable'
 ./scripts/db-migrate.sh up
-```
-
-Run the local operator API:
-
-```bash
 export WTP_OPERATOR_ID='local-admin'
+export WTP_OPERATOR_ROLE='viewer'
 export WTP_OPERATOR_TOKEN="$(openssl rand -hex 32)"
 go run ./apps/control-plane
 ```
 
-Run one reconciliation cycle against a local SPIRE Server:
+Use `WTP_OPERATOR_ROLE=operator` only when local registration desired-state write permission is intended.
 
 ```bash
 export WTP_SPIRE_SERVER_SOCKET='/tmp/workload-trust-lab/server.sock'

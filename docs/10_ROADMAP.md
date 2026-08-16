@@ -5,72 +5,50 @@ Date: 2026-08-14
 
 ## Phase 0 — Foundation ✅
 
-Completed on main:
-
-- product source of truth;
-- V1/non-V1;
-- architecture;
-- threat model;
-- security invariants;
-- identity model;
-- policy model;
-- data model;
-- API boundaries;
-- ADRs;
-- Definition of Done;
-- foundation CI validation.
+Completed on main: product/source-of-truth, V1 scope, architecture/threat/security/identity/policy/data/API docs, ADRs, Definition of Done and foundation CI.
 
 ## Phase 1 — SPIFFE/SPIRE identity lab ✅
 
-Completed/evidenced:
-
-- reproducible SPIRE Server/Agent environment;
-- verified upstream SPIRE v1.15.2 release download;
-- Docker/Linux attestation using runtime Docker selectors;
-- four registered demo workload identities;
-- positive and negative identity tests;
-- workload recreation/re-attestation;
-- automatic short-lived X.509-SVID rotation;
-- CI diagnostics/redaction;
-- permanent CI evidence on exact main commit.
+Completed/evidenced: reproducible SPIRE v1.15.2 Server/Agent lab, verified release download, Docker attestation, four demo identities, positive/negative identity tests, restart/re-attestation, automatic short-lived X.509-SVID rotation and permanent exact-main CI evidence.
 
 Phase 1 establishes identity only. It does not claim service authorization or production readiness.
 
 ## Phase 2 — Go control plane 🚧
 
-Completed in the implemented Phase 2 slices:
+Completed in implemented Phase 2 slices:
 
-- Go control-plane process with graceful shutdown and structured logging;
-- loopback-only HTTP surface with generic health/readiness endpoints;
-- authenticated `/v1/*` reads through a local high-entropy bearer credential and attributable operator ID;
-- PostgreSQL 18 schema/migrations;
-- workload inventory read repository and endpoint;
-- append-only audit repository primitive;
-- append-only access-policy version history at the database layer;
-- registration-rule reconciliation state/bindings;
-- official SPIRE v1.15.2 Entry API integration over the local Unix socket;
-- ownership-safe create/update/delete reconciliation and drift handling;
-- reconciliation audit linkage and foreign-entry refusal;
-- real PostgreSQL migration/repository integration tests;
-- permanent real SPIRE reconciliation lifecycle CI;
-- Go formatting, module-graph, vet and race-detector CI.
+- Go control-plane + one-shot reconciliation processes;
+- loopback-only management HTTP surface with generic health/readiness;
+- high-entropy bearer authentication and attributable local operator identity;
+- fail-closed `viewer`/`operator` permission mapping, defaulting to read-only viewer;
+- PostgreSQL 18 schema/migrations and append-only audit/policy history;
+- authenticated workload inventory read path;
+- authenticated + server-authorized registration desired-state POST/PATCH;
+- strict/bounded mutation input and safe output/error envelopes;
+- optimistic registration revision protection;
+- registration desired-state mutation + operator audit in one transaction, including forced-audit-failure rollback evidence;
+- registration reconciliation state/bindings;
+- official SPIRE v1.15.2 Entry API integration over local Unix socket;
+- ownership-safe create/update/delete reconciliation, drift handling and foreign-entry refusal;
+- permanent real PostgreSQL/SPIRE reconciliation lifecycle CI;
+- permanent live Operator Mutation Integration CI;
+- module graph/gofmt/vet/race/real PostgreSQL CI.
 
 Remaining before Phase 2 exit:
 
-- operator authorization model beyond the current single configured principal;
-- authenticated operator mutation/service workflows (HTTP mutation routes remain absent);
-- policy activation workflow and audit linkage;
+- policy creation/versioning/activation workflow with authorization + transactional audit;
 - CLI diagnostics/inspection surface;
-- security review of the completed control-plane boundary;
-- Phase 2 evidence document and exact-main verification.
+- completed control-plane security review/failure tests;
+- Phase 2 consolidated evidence and exact-main exit verification;
+- decision on whether V1 local operator remains single-principal or requires a multi-principal/session model before the console phase.
 
 ## Phase 3 — Authorization enforcement
 
 - mTLS reference path;
 - verified SPIFFE identity extraction;
-- deterministic policy engine;
+- deterministic default-deny policy engine;
 - allow/deny integration suite;
-- failure semantics.
+- policy-absence/corruption failure semantics.
 
 ## Phase 4 — Operator console
 
@@ -100,14 +78,4 @@ Remaining before Phase 2 exit:
 
 ## Post-V1 candidates
 
-Evaluate based on user need, not portfolio optics:
-
-- Kubernetes workload identity;
-- cloud node/workload attestation;
-- federation;
-- Envoy/service-mesh integrations;
-- policy-as-code/GitOps;
-- enterprise identity/RBAC/SSO;
-- high availability;
-- managed control plane;
-- workload access graph and security intelligence.
+Kubernetes/cloud attestation, federation, Envoy/service-mesh integrations, GitOps/policy-as-code, enterprise identity/RBAC/SSO, HA/managed control plane, and workload access/security intelligence are post-V1 candidates unless explicitly promoted by a later decision.

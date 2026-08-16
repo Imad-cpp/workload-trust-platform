@@ -14,6 +14,7 @@ import (
 	"github.com/Imad-cpp/workload-trust-platform/internal/database"
 	"github.com/Imad-cpp/workload-trust-platform/internal/httpapi"
 	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
+	"github.com/Imad-cpp/workload-trust-platform/internal/registration"
 	"github.com/Imad-cpp/workload-trust-platform/internal/workload"
 )
 
@@ -31,7 +32,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	authenticator, err := operatorauth.NewStaticBearer(cfg.OperatorToken, cfg.OperatorID)
+	authenticator, err := operatorauth.NewStaticBearer(cfg.OperatorToken, cfg.OperatorID, cfg.OperatorRole)
 	if err != nil {
 		return err
 	}
@@ -47,9 +48,11 @@ func run(logger *slog.Logger) error {
 
 	workloads := workload.NewPostgresRepository(pool)
 	api, err := httpapi.New(httpapi.Dependencies{
-		Readiness:     pool,
-		Workloads:     workloads,
-		Authenticator: authenticator,
+		Readiness:             pool,
+		Workloads:             workloads,
+		RegistrationMutations: registration.NewPostgresMutationService(pool),
+		Authenticator:         authenticator,
+		Authorizer:            operatorauth.RBAC{},
 	})
 	if err != nil {
 		return err
