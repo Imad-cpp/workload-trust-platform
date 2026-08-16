@@ -44,4 +44,4 @@ jobs:
         run: go mod download
 
       - name: Verify live policy versioning and activation
-        run: ./scripts/policy-mutation-ci.sh
+        run: bash ./scripts/policy-mutation-ci.sh
