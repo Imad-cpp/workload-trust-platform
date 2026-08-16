@@ -67,8 +67,8 @@ type Mutator interface {
 }
 
 func validateActor(actor MutationActor) error {
-	if actor.Type != "operator" || strings.TrimSpace(actor.ID) == "" || strings.TrimSpace(actor.Role) == "" {
-		return fmt.Errorf("%w: operator actor attribution is required", ErrInvalidInput)
+	if actor.Type != "operator" || strings.TrimSpace(actor.ID) == "" || actor.Role != "operator" {
+		return fmt.Errorf("%w: authorized operator actor attribution is required", ErrInvalidInput)
 	}
 	return nil
 }
@@ -135,8 +135,13 @@ func validateSPIFFEID(raw string) error {
 	if parsed.Hostname() != parsed.Host || parsed.Host != strings.ToLower(parsed.Host) {
 		return errors.New("SPIFFE trust domain must be lowercase and must not contain a port")
 	}
-	if parsed.Path == "" || !strings.HasPrefix(parsed.Path, "/") || parsed.RawPath != "" {
+	if parsed.Path == "" || !strings.HasPrefix(parsed.Path, "/") || parsed.RawPath != "" || parsed.String() != raw {
 		return errors.New("SPIFFE ID path must be canonical and absolute")
+	}
+	for _, segment := range strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return errors.New("SPIFFE ID path must not contain empty or dot segments")
+		}
 	}
 	return nil
 }
