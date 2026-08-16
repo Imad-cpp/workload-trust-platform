@@ -57,7 +57,12 @@ func run(args []string, getenv func(string) string, stdout, stderr io.Writer) er
 	client := &apiClient{
 		baseURL: parsed,
 		token:   getenv("WTP_OPERATOR_TOKEN"),
-		http:    &http.Client{Timeout: 5 * time.Second},
+		http: &http.Client{
+			Timeout: 5 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 
 	switch args[0] {
