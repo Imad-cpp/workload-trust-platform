@@ -14,6 +14,7 @@ import (
 	"github.com/Imad-cpp/workload-trust-platform/internal/database"
 	"github.com/Imad-cpp/workload-trust-platform/internal/httpapi"
 	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
+	"github.com/Imad-cpp/workload-trust-platform/internal/policy"
 	"github.com/Imad-cpp/workload-trust-platform/internal/registration"
 	"github.com/Imad-cpp/workload-trust-platform/internal/workload"
 )
@@ -51,6 +52,7 @@ func run(logger *slog.Logger) error {
 		Readiness:             pool,
 		Workloads:             workloads,
 		RegistrationMutations: registration.NewPostgresMutationService(pool),
+		PolicyManager:         policy.NewPostgresManager(pool),
 		Authenticator:         authenticator,
 		Authorizer:            operatorauth.RBAC{},
 	})
@@ -74,8 +76,7 @@ func run(logger *slog.Logger) error {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serveErr <- err
 			return
-		}
-		serveErr <- nil
+		}		serveErr <- nil
 	}()
 
 	select {
