@@ -69,6 +69,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify control-plane script syntax
+        run: bash -n scripts/db-migrate.sh scripts/test-migrations.sh scripts/policy-mutation-ci.sh
+
       - name: Vet
         run: go vet ./...
 
