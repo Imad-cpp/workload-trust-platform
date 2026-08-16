@@ -1,11 +1,11 @@
 # 15 — Go Control-Plane Foundation
 
 Status: Phase 2 active  
-Date: 2026-08-14
+Date: 2026-08-16
 
 ## Purpose
 
-The Phase 2 control plane now includes authenticated/authorized local management reads, transactionally audited registration desired-state mutations, and an internal SPIRE desired-state reconciler. Remote management remains closed.
+The Phase 2 control plane now includes authenticated/authorized local management reads, transactionally audited registration desired-state mutations, versioned policy management/activation, and an internal SPIRE desired-state reconciler. Remote management remains closed.
 
 It establishes:
 
@@ -15,13 +15,14 @@ It establishes:
 - loopback-only `/v1/*` bearer authentication;
 - fail-closed local `viewer`/`operator` permission checks;
 - authenticated workload reads;
-- authorized registration desired-state POST/PATCH with strict/bounded JSON validation;
-- optimistic registration revision protection;
-- mutation + operator audit atomicity in PostgreSQL;
+- authorized registration desired-state POST/PATCH with optimistic revisions and atomic audit;
+- authorized policy create/version/activation routes with distinct activation permission;
+- immutable policy versions and optimistic policy envelope revisions;
+- canonical SPIFFE policy validation, stored-version revalidation and atomic activation audit;
 - registration reconciliation state and ownership-safe SPIRE v1.15.2 Entry API integration;
 - real PostgreSQL, live HTTP and real SPIRE permanent CI.
 
-It does not complete Phase 2. Policy activation, CLI diagnostics, consolidated control-plane security/failure review and the Phase 2 exit evidence remain future work.
+It does not complete Phase 2. CLI diagnostics, consolidated control-plane security/failure review and Phase 2 exit evidence remain future work. Workload service authorization remains Phase 3.
 
 ## Operator runtime
 
@@ -46,17 +47,28 @@ Missing role defaults to `viewer`.
 - `GET /readyz` — generic PostgreSQL readiness;
 - `GET /v1/workloads?organization_id=<uuid>` — authenticated/authorized inventory;
 - `POST /v1/registration-rules` — requires `registrations:write`;
-- `PATCH /v1/registration-rules/{id}` — full desired-state replacement requiring `expected_revision` and `registrations:write`.
+- `PATCH /v1/registration-rules/{id}` — full desired-state replacement requiring `expected_revision` and `registrations:write`;
+- `POST /v1/policies` — creates draft policy + immutable version 1 with `policies:write`;
+- `POST /v1/policies/{id}/versions` — appends immutable version with `policies:write` + `expected_revision`;
+- `POST /v1/policies/{id}/activate` — selects a valid owned version with `policies:activate` + `expected_revision`.
 
-No workload mutation route exists. Registration mutation routes now exist, but they only change pending PostgreSQL desired state; they do not call SPIRE directly.
+No workload mutation route exists. Registration/policy routes change PostgreSQL management state only. They do not directly enforce workload access.
 
 The local role model is still one configured principal per process, not a remote/multi-user session/RBAC platform.
 
-## Transactional mutation boundary
+## Transactional management boundary
 
-Registration create/replace operations validate canonical parent SPIFFE IDs, selector shape/count, TTL, JSON media/body shape and a 64 KiB body limit.
+Registration and policy mutation bodies use strict bounded JSON and stable generic errors. Policy V1 accepts canonical source/destination SPIFFE IDs, `connect`, `allow|deny` and a bounded change reason.
 
-Every successful mutation and its attributed operator audit insert commit in the same PostgreSQL transaction. An intentionally failed audit insert is tested to roll back the desired-state mutation. Responses and audit summaries omit parent SPIFFE IDs and selector values.
+Successful registration mutations and successful policy create/version/activation operations each commit their attributed audit insert in the same PostgreSQL transaction. Intentionally failed audit inserts are tested to roll the corresponding state change back.
+
+Policy responses/audit summaries omit source/destination SPIFFE IDs and change-reason text. Registration responses/audits omit parent/selector values.
+
+## Policy activation semantics
+
+Policy versions are immutable. `access_policies.revision` provides optimistic concurrency. Activation requires a version owned by the target policy and revalidates its stored content immediately before selecting it.
+
+`active_version_id` means selected desired policy state only. It is **not** an enforcement result and does not grant service access by itself.
 
 ## SPIRE reconciliation runtime
 
@@ -71,35 +83,39 @@ The reconciler reads pending registration desired state and converges owned SPIR
 
 ## PostgreSQL schema/history
 
-`000001_control_plane` defines core product/history state. `000002_registration_reconciliation` adds parent identity, TTL, SPIRE binding, convergence and error state.
+- `000001_control_plane` defines core product/history state;
+- `000002_registration_reconciliation` adds SPIRE convergence state;
+- `000003_policy_revision` adds optimistic revision state to the policy envelope.
 
-`audit_events` and `access_policy_versions` remain append-only at the PostgreSQL layer. Registration operator mutations use existing schema and transactional service semantics rather than a new migration.
+Migration CI applies all three in order, rolls them back in reverse order, reapplies them, and semantically verifies policy revision defaults after re-apply.
+
+`audit_events` and `access_policy_versions` remain append-only at the PostgreSQL layer.
 
 ## Permanent evidence
 
 ```text
 Foundation validation
-Go module graph / gofmt / vet / race
-PostgreSQL migrate up -> test -> down -> up
-real PostgreSQL repositories and atomic-audit rollback
-live operator authz/mutation lifecycle: 401 / 403 / 201 / 200 / 409
+Go module graph / gofmt / shell syntax / vet / race
+PostgreSQL migrations 000001 -> 000002 -> 000003 -> rollback -> re-apply
+real PostgreSQL repositories and forced atomic-audit rollback tests
+live registration management: 401 / 403 / 201 / 200 / 409
+live policy management: 401 / 403 / 201 / 201 / 409 / 200 / foreign 404
 SPIRE identity regression lab
-PostgreSQL desired state -> SPIRE create -> workload SVID
-owned drift -> SPIRE update
-foreign matching entry -> ownership refusal
-owned desired absent -> SPIRE delete -> workload loses identity
+PostgreSQL desired registration state -> SPIRE create/update/delete
+foreign matching SPIRE entry -> ownership refusal
 ```
 
 ## Security boundaries
 
 - management HTTP remains loopback-only;
 - authentication and server-side role authorization protect current `/v1/*` management routes;
-- registration mutation/audit is atomic and attributable;
+- registration and policy state/audit mutations are atomic and attributable;
 - health/readiness remain unauthenticated and generic;
 - SPIRE management access remains local and highly privileged;
 - internal database/repository errors are not reflected verbatim;
 - credentials and workload private keys are not intentionally logged/stored by product state;
-- service authorization and mTLS enforcement remain Phase 3 work.
+- policy activation is management state, not service authorization;
+- default-deny service enforcement and mTLS remain Phase 3 work.
 
 ## Local development
 
@@ -113,7 +129,7 @@ export WTP_OPERATOR_TOKEN="$(openssl rand -hex 32)"
 go run ./apps/control-plane
 ```
 
-Use `WTP_OPERATOR_ROLE=operator` only when local registration desired-state write permission is intended.
+Use `WTP_OPERATOR_ROLE=operator` only when local registration/policy management write permission is intended.
 
 ```bash
 export WTP_SPIRE_SERVER_SOCKET='/tmp/workload-trust-lab/server.sock'

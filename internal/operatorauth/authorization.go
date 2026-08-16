@@ -18,6 +18,9 @@ const (
 	PermissionWorkloadsRead      Permission = "workloads:read"
 	PermissionRegistrationsRead  Permission = "registrations:read"
 	PermissionRegistrationsWrite Permission = "registrations:write"
+	PermissionPoliciesRead       Permission = "policies:read"
+	PermissionPoliciesWrite      Permission = "policies:write"
+	PermissionPoliciesActivate   Permission = "policies:activate"
 )
 
 type Authorizer interface {
@@ -45,9 +48,16 @@ func (RBAC) Allowed(principal Principal, permission Permission) bool {
 
 	switch principal.Role {
 	case RoleViewer:
-		return permission == PermissionWorkloadsRead || permission == PermissionRegistrationsRead
+		return permission == PermissionWorkloadsRead ||
+			permission == PermissionRegistrationsRead ||
+			permission == PermissionPoliciesRead
 	case RoleOperator:
-		return permission == PermissionWorkloadsRead || permission == PermissionRegistrationsRead || permission == PermissionRegistrationsWrite
+		return permission == PermissionWorkloadsRead ||
+			permission == PermissionRegistrationsRead ||
+			permission == PermissionRegistrationsWrite ||
+			permission == PermissionPoliciesRead ||
+			permission == PermissionPoliciesWrite ||
+			permission == PermissionPoliciesActivate
 	default:
 		return false
 	}

@@ -1,0 +1,47 @@
+name: Policy Mutation Integration
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-mutations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18.4-alpine
+        env:
+          POSTGRES_DB: workload_trust_policy_mutation
+          POSTGRES_USER: workload_trust
+          POSTGRES_PASSWORD: workload-trust-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U workload_trust -d workload_trust_policy_mutation"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://workload_trust:workload-trust-ci@127.0.0.1:5432/workload_trust_policy_mutation?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: 1.26.5
+          cache: false
+
+      - name: Download committed modules
+        run: go mod download
+
+      - name: Verify live policy versioning and activation
+        run: bash ./scripts/policy-mutation-ci.sh

@@ -1,24 +1,26 @@
 # 05 — Policy Model
 
-Status: Draft  
-Date: 2026-08-14
+Status: Phase 2 management model implemented; enforcement pending  
+Date: 2026-08-16
 
 ## Principle
 
 Identity answers **who is this workload?** Policy answers **what may this identity do?**
 
+Policy management and policy enforcement are separate boundaries. Phase 2 now stores, versions and activates policy desired state. Phase 3 will evaluate that state against verified workload identities and enforce decisions.
+
 ## V1 authorization tuple
 
-A minimal policy decision is based on:
+The V1 policy tuple is deliberately narrow:
 
 ```text
 source identity
 destination identity
-action
-effect
+action = connect
+effect = allow | deny
 ```
 
-V1 action begins with service connection/call semantics. Protocol-specific attributes can be added only when enforcement semantics are clear.
+Protocol-specific attributes are not accepted until their enforcement semantics are defined and tested.
 
 ## Example
 
@@ -29,18 +31,27 @@ action: connect
 effect: allow
 ```
 
-Everything not explicitly allowed is denied.
+The intended Phase 3 enforcement model is default-deny: anything not explicitly allowed is denied. **Default-deny service enforcement is not implemented in Phase 2.**
 
-## Required semantics
+## Implemented management semantics
 
-- policies are explicit and deterministic;
-- no wildcard is introduced without documented matching semantics and tests;
-- deny/allow conflict behavior must be defined before implementation;
-- malformed policy cannot be activated;
-- policy mutation creates a new version rather than silently rewriting historical evidence;
+- source/destination identities must be canonical SPIFFE IDs;
+- V1 accepts only the `connect` action;
+- effects are canonical `allow` or `deny`;
+- no wildcard matching exists;
+- policy creation produces immutable version 1 and a draft policy;
+- changing policy content appends a new immutable version rather than editing history;
+- `access_policy_versions` rejects UPDATE/DELETE at the database layer;
+- append/activation require optimistic `expected_revision`;
+- activation requires a version owned by the target policy;
+- stored version content is revalidated before activation;
+- policy activation and its attributed operator audit commit in the same PostgreSQL transaction;
+- audit failure rolls activation/version mutation back;
 - active policy can be traced to an operator action.
 
-## V1 demo matrix
+`active_version_id` means **selected desired policy state**, not proven service authorization.
+
+## V1 demo matrix for Phase 3
 
 | Source | Destination | Expected |
 |---|---|---|
@@ -48,6 +59,8 @@ Everything not explicitly allowed is denied.
 | orders-api | payment-api | ALLOW |
 | frontend | payment-api | DENY |
 | payment-api | admin-api | DENY |
+
+These ALLOW/DENY outcomes remain an enforcement acceptance target; the current Phase 2 implementation does not claim them yet.
 
 ## Later dimensions
 

@@ -1,7 +1,7 @@
 # 10 — Roadmap
 
 Status: Directional  
-Date: 2026-08-14
+Date: 2026-08-16
 
 ## Phase 0 — Foundation ✅
 
@@ -21,34 +21,38 @@ Completed in implemented Phase 2 slices:
 - loopback-only management HTTP surface with generic health/readiness;
 - high-entropy bearer authentication and attributable local operator identity;
 - fail-closed `viewer`/`operator` permission mapping, defaulting to read-only viewer;
-- PostgreSQL 18 schema/migrations and append-only audit/policy history;
+- PostgreSQL 18 schema/migrations through `000003_policy_revision` and append-only audit/policy history;
 - authenticated workload inventory read path;
 - authenticated + server-authorized registration desired-state POST/PATCH;
 - strict/bounded mutation input and safe output/error envelopes;
-- optimistic registration revision protection;
-- registration desired-state mutation + operator audit in one transaction, including forced-audit-failure rollback evidence;
-- registration reconciliation state/bindings;
-- official SPIRE v1.15.2 Entry API integration over local Unix socket;
-- ownership-safe create/update/delete reconciliation, drift handling and foreign-entry refusal;
-- permanent real PostgreSQL/SPIRE reconciliation lifecycle CI;
-- permanent live Operator Mutation Integration CI;
-- module graph/gofmt/vet/race/real PostgreSQL CI.
+- optimistic registration revision protection and transactional registration audit;
+- official SPIRE v1.15.2 Entry API reconciliation, drift repair and foreign-entry refusal;
+- authorized policy create/version/activation management routes;
+- immutable policy history with `connect` + `allow|deny` V1 content;
+- optimistic policy revisions and distinct `policies:activate` permission;
+- stored-version revalidation before activation;
+- transactionally coupled policy state + audit with forced-audit-failure rollback evidence;
+- live policy tests for 401/403/201/409/200, stale writes and foreign-version activation refusal;
+- permanent real PostgreSQL/SPIRE/operator/policy integration CI;
+- module graph/gofmt/shell-syntax/vet/race/real PostgreSQL CI.
 
 Remaining before Phase 2 exit:
 
-- policy creation/versioning/activation workflow with authorization + transactional audit;
 - CLI diagnostics/inspection surface;
-- completed control-plane security review/failure tests;
+- completed control-plane security/failure review;
 - Phase 2 consolidated evidence and exact-main exit verification;
 - decision on whether V1 local operator remains single-principal or requires a multi-principal/session model before the console phase.
+
+Policy activation in Phase 2 means selected desired state only. It does not enforce workload access.
 
 ## Phase 3 — Authorization enforcement
 
 - mTLS reference path;
 - verified SPIFFE identity extraction;
-- deterministic default-deny policy engine;
-- allow/deny integration suite;
-- policy-absence/corruption failure semantics.
+- deterministic default-deny policy engine consuming selected active policy versions;
+- allowed/forbidden service-call integration suite;
+- policy-absence/corruption failure semantics;
+- safe decision reason metadata.
 
 ## Phase 4 — Operator console
 

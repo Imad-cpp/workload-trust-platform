@@ -26,6 +26,7 @@ DECLARE
     policy_id uuid;
     policy_version_id uuid;
     audit_id uuid;
+    policy_revision bigint;
 BEGIN
     SELECT id INTO org_id FROM organizations WHERE slug = 'phase2-test';
 
@@ -47,6 +48,11 @@ BEGIN
     INSERT INTO access_policies (organization_id, name)
     VALUES (org_id, 'frontend-to-orders')
     RETURNING id INTO policy_id;
+
+    SELECT revision INTO policy_revision FROM access_policies WHERE id = policy_id;
+    IF policy_revision <> 1 THEN
+        RAISE EXCEPTION 'access policy revision default is %, expected 1', policy_revision;
+    END IF;
 
     INSERT INTO access_policy_versions (
         policy_id, version, source_spiffe_id, destination_spiffe_id,
@@ -117,4 +123,25 @@ fi
 
 "${ROOT}/scripts/db-migrate.sh" up
 
-echo "PostgreSQL migration apply/rollback/apply, policy-history, and audit append-only tests passed."
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE
+    org_id uuid;
+    policy_revision bigint;
+BEGIN
+    INSERT INTO organizations (slug, display_name)
+    VALUES ('phase2-reapply', 'Phase 2 Reapply')
+    RETURNING id INTO org_id;
+
+    INSERT INTO access_policies (organization_id, name)
+    VALUES (org_id, 'phase2-reapply-policy')
+    RETURNING revision INTO policy_revision;
+
+    IF policy_revision <> 1 THEN
+        RAISE EXCEPTION 'access policy revision default after re-apply is %, expected 1', policy_revision;
+    END IF;
+END
+$$;
+SQL
+
+echo "PostgreSQL migration apply/rollback/apply, policy-revision, policy-history, and audit append-only tests passed."

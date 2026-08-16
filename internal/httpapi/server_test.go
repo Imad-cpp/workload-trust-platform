@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
+	"github.com/Imad-cpp/workload-trust-platform/internal/policy"
 	"github.com/Imad-cpp/workload-trust-platform/internal/registration"
 	"github.com/Imad-cpp/workload-trust-platform/internal/workload"
 )
@@ -55,6 +56,20 @@ func (s *mutationStub) ReplaceDesired(_ context.Context, actor registration.Muta
 	return s.replaceResult, s.replaceErr
 }
 
+type policyManagerStub struct{}
+
+func (policyManagerStub) Create(context.Context, policy.MutationActor, string, policy.CreateInput) (policy.CreateResult, error) {
+	return policy.CreateResult{}, nil
+}
+
+func (policyManagerStub) AppendVersion(context.Context, policy.MutationActor, string, string, policy.AppendVersionInput) (policy.VersionResult, error) {
+	return policy.VersionResult{}, nil
+}
+
+func (policyManagerStub) Activate(context.Context, policy.MutationActor, string, string, policy.ActivateInput) (policy.PolicyResult, error) {
+	return policy.PolicyResult{}, nil
+}
+
 func newTestHandler(t *testing.T, role operatorauth.Role, readinessErr error, lister workload.Lister, mutators ...registration.Mutator) http.Handler {
 	t.Helper()
 	authenticator, err := operatorauth.NewStaticBearer(testOperatorToken, "test-operator", role)
@@ -69,6 +84,7 @@ func newTestHandler(t *testing.T, role operatorauth.Role, readinessErr error, li
 		Readiness:             readinessStub{err: readinessErr},
 		Workloads:             lister,
 		RegistrationMutations: mutator,
+		PolicyManager:         policyManagerStub{},
 		Authenticator:         authenticator,
 		Authorizer:            operatorauth.RBAC{},
 	})
