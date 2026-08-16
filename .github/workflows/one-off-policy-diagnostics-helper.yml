@@ -1,0 +1,41 @@
+name: One-off Policy Diagnostics Helper
+
+on:
+  push:
+    branches:
+      - feat/cli-diagnostics
+    paths:
+      - .github/workflows/one-off-policy-diagnostics-helper.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/cli-diagnostics
+      - name: Patch policy HTTP test helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('internal/httpapi/policy_mutations_test.go')
+          s = p.read_text()
+          if 'Diagnostics:           &diagnosticsStub{},' in s:
+              raise SystemExit('diagnostics dependency already present')
+          anchor = '\t\tWorkloads:             policyWorkloadStub{},\n\t\tRegistrationMutations: policyRegistrationStub{},'
+          replacement = '\t\tWorkloads:             policyWorkloadStub{},\n\t\tDiagnostics:           &diagnosticsStub{},\n\t\tRegistrationMutations: policyRegistrationStub{},'
+          if anchor not in s:
+              raise SystemExit('policy helper anchor not found')
+          p.write_text(s.replace(anchor, replacement, 1))
+          PY
+          gofmt -w internal/httpapi/policy_mutations_test.go
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add internal/httpapi/policy_mutations_test.go
+          git commit -m 'test: wire diagnostics into policy HTTP helper'
+          git push origin HEAD:feat/cli-diagnostics

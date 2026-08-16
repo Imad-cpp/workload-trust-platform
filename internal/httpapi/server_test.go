@@ -83,6 +83,7 @@ func newTestHandler(t *testing.T, role operatorauth.Role, readinessErr error, li
 	server, err := New(Dependencies{
 		Readiness:             readinessStub{err: readinessErr},
 		Workloads:             lister,
+		Diagnostics:           &diagnosticsStub{},
 		RegistrationMutations: mutator,
 		PolicyManager:         policyManagerStub{},
 		Authenticator:         authenticator,

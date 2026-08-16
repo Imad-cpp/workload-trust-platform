@@ -78,6 +78,7 @@ func newPolicyHTTPHandler(t *testing.T, role operatorauth.Role, manager policy.M
 	server, err := New(Dependencies{
 		Readiness:             policyReadinessStub{},
 		Workloads:             policyWorkloadStub{},
+		Diagnostics:           &diagnosticsStub{},
 		RegistrationMutations: policyRegistrationStub{},
 		PolicyManager:         manager,
 		Authenticator:         authenticator,

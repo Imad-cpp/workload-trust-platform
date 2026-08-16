@@ -33,17 +33,19 @@ Completed in implemented Phase 2 slices:
 - stored-version revalidation before activation;
 - transactionally coupled policy state + audit with forced-audit-failure rollback evidence;
 - live policy tests for 401/403/201/409/200, stale writes and foreign-version activation refusal;
-- permanent real PostgreSQL/SPIRE/operator/policy integration CI;
+- aggregate `diagnostics:read` organization status endpoint with no sensitive rule/audit payloads;
+- local read-only `wtpctl` commands for health, readiness, workload inventory and aggregate status;
+- CLI loopback-only URL validation, redirect refusal, bearer validation, bounded responses and no direct PostgreSQL dependency;
+- permanent real PostgreSQL/SPIRE/operator/policy/CLI integration CI;
 - module graph/gofmt/shell-syntax/vet/race/real PostgreSQL CI.
 
 Remaining before Phase 2 exit:
 
-- CLI diagnostics/inspection surface;
 - completed control-plane security/failure review;
 - Phase 2 consolidated evidence and exact-main exit verification;
 - decision on whether V1 local operator remains single-principal or requires a multi-principal/session model before the console phase.
 
-Policy activation in Phase 2 means selected desired state only. It does not enforce workload access.
+Policy activation in Phase 2 means selected desired state only. It does not enforce workload access. CLI diagnostics remain local read-only management inspection only.
 
 ## Phase 3 — Authorization enforcement
 

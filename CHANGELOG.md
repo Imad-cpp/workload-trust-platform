@@ -33,6 +33,12 @@ All notable changes to this project will be documented here.
 - Transactionally coupled policy state + operator audit, including forced-audit-failure rollback evidence.
 - Live Policy Mutation Integration CI proving 401/403/201/201/409/200, foreign-version refusal and safe audit/response behavior.
 - ADR-0010 and Phase 2 policy-management evidence documentation.
+- `diagnostics:read` aggregate organization diagnostics endpoint for viewer/operator inspection.
+- PostgreSQL diagnostics reader exposing workload/registration/policy/audit/security counts without rule/audit payloads.
+- Local read-only `wtpctl` commands for health, readiness, workload inventory and aggregate status.
+- CLI loopback URL validation, redirect refusal, bearer validation, five-second timeout and 1 MiB response cap.
+- Live CLI Diagnostics Integration CI proving no CLI database dependency, safe aggregate output, wrong-token refusal, non-loopback rejection and read-only audit behavior.
+- ADR-0011 and Phase 2 CLI diagnostics evidence documentation.
 
 ### Changed
 
@@ -41,3 +47,4 @@ All notable changes to this project will be documented here.
 - Registration PATCH is defined as a full desired-state replacement guarded by `expected_revision`.
 - The migration runner now applies `000001` → `000002` → `000003` and rolls back in reverse order.
 - Active policy state now means a selected immutable desired policy version; service authorization/enforcement remains Phase 3.
+- Phase 2 diagnostics use the server-authorized loopback management API rather than a direct CLI-to-PostgreSQL data path.
