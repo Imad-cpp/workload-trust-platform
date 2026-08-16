@@ -1,0 +1,71 @@
+name: One-off Policy PSQL Fix
+
+on:
+  push:
+    branches:
+      - feat/policy-version-activation-v2
+    paths:
+      - .github/workflows/one-off-policy-psql-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/policy-version-activation-v2
+      - name: Convert variable queries to stdin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('scripts/policy-mutation-ci.sh')
+          lines = p.read_text().splitlines()
+          out = []
+          assignment = re.compile(r'^(?P<name>[A-Z0-9_]+)="\$\(sql_scalar (?P<vars>(?:-v [A-Za-z0-9_]+="\$\{[^}]+\}"\s*)+)-c "(?P<sql>.*)"\)"$')
+          conditional = re.compile(r'^if sql_scalar (?P<vars>(?:-v [A-Za-z0-9_]+="\$\{[^}]+\}"\s*)+)-c "(?P<sql>.*)" >/dev/null 2>&1; then$')
+          changed = 0
+
+          def sql_line(value: str) -> str:
+              value = value.rstrip()
+              return value if value.endswith(';') else value + ';'
+
+          for line in lines:
+              m = assignment.match(line)
+              if m:
+                  out.append(f'{m.group("name")}="$(sql_scalar {m.group("vars").rstrip()} <<\'SQL\'')
+                  out.append(sql_line(m.group('sql')))
+                  out.append('SQL')
+                  out.append(')"')
+                  changed += 1
+                  continue
+              m = conditional.match(line)
+              if m:
+                  out.append(f'if sql_scalar {m.group("vars").rstrip()} >/dev/null 2>&1 <<\'SQL\'')
+                  out.append(sql_line(m.group('sql')))
+                  out.append('SQL')
+                  out.append('then')
+                  changed += 1
+                  continue
+              out.append(line)
+
+          text = '\n'.join(out) + '\n'
+          if re.search(r'sql_scalar\s+[^\n]*-v\s+[^\n]*-c\s+', text):
+              raise SystemExit('variable-bearing psql -c call remains after patch')
+          if changed < 10:
+              raise SystemExit(f'expected to convert at least 10 calls, converted {changed}')
+          p.write_text(text)
+          print(f'converted {changed} variable-bearing psql -c calls')
+          PY
+          bash -n scripts/policy-mutation-ci.sh
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/policy-mutation-ci.sh
+          git commit -m 'test: use psql stdin for policy evidence queries'
+          git push origin HEAD:feat/policy-version-activation-v2
