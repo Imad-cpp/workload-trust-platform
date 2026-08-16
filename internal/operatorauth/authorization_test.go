@@ -2,26 +2,46 @@ package operatorauth
 
 import "testing"
 
-func TestViewerCannotWriteRegistrations(t *testing.T) {
+func TestViewerCannotWriteRegistrationsOrPolicies(t *testing.T) {
 	principal := Principal{ActorType: "operator", ActorID: "viewer-1", Role: RoleViewer}
-	if (RBAC{}).Allowed(principal, PermissionRegistrationsWrite) {
-		t.Fatal("viewer unexpectedly received registration write permission")
+	for _, permission := range []Permission{
+		PermissionRegistrationsWrite,
+		PermissionPoliciesWrite,
+		PermissionPoliciesActivate,
+	} {
+		if (RBAC{}).Allowed(principal, permission) {
+			t.Fatalf("viewer unexpectedly received %q", permission)
+		}
 	}
-	if !(RBAC{}).Allowed(principal, PermissionWorkloadsRead) {
-		t.Fatal("viewer should retain workload read permission")
+	for _, permission := range []Permission{
+		PermissionWorkloadsRead,
+		PermissionRegistrationsRead,
+		PermissionPoliciesRead,
+	} {
+		if !(RBAC{}).Allowed(principal, permission) {
+			t.Fatalf("viewer should retain %q", permission)
+		}
 	}
 }
 
-func TestOperatorCanWriteRegistrations(t *testing.T) {
+func TestOperatorCanManageRegistrationsAndPolicies(t *testing.T) {
 	principal := Principal{ActorType: "operator", ActorID: "operator-1", Role: RoleOperator}
-	if !(RBAC{}).Allowed(principal, PermissionRegistrationsWrite) {
-		t.Fatal("operator should receive registration write permission")
+	for _, permission := range []Permission{
+		PermissionRegistrationsWrite,
+		PermissionPoliciesWrite,
+		PermissionPoliciesActivate,
+	} {
+		if !(RBAC{}).Allowed(principal, permission) {
+			t.Fatalf("operator should receive %q", permission)
+		}
 	}
 }
 
 func TestUnknownRoleFailsClosed(t *testing.T) {
 	principal := Principal{ActorType: "operator", ActorID: "unknown", Role: Role("owner")}
-	if (RBAC{}).Allowed(principal, PermissionWorkloadsRead) {
+	if (RBAC{}).Allowed(principal, PermissionWorkloadsRead) ||
+		(RBAC{}).Allowed(principal, PermissionPoliciesRead) ||
+		(RBAC{}).Allowed(principal, PermissionPoliciesActivate) {
 		t.Fatal("unknown role unexpectedly received permission")
 	}
 }
