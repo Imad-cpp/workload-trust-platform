@@ -12,6 +12,7 @@ import (
 
 	"github.com/Imad-cpp/workload-trust-platform/internal/config"
 	"github.com/Imad-cpp/workload-trust-platform/internal/database"
+	"github.com/Imad-cpp/workload-trust-platform/internal/diagnostics"
 	"github.com/Imad-cpp/workload-trust-platform/internal/httpapi"
 	"github.com/Imad-cpp/workload-trust-platform/internal/operatorauth"
 	"github.com/Imad-cpp/workload-trust-platform/internal/policy"
@@ -51,6 +52,7 @@ func run(logger *slog.Logger) error {
 	api, err := httpapi.New(httpapi.Dependencies{
 		Readiness:             pool,
 		Workloads:             workloads,
+		Diagnostics:           diagnostics.NewPostgresReader(pool),
 		RegistrationMutations: registration.NewPostgresMutationService(pool),
 		PolicyManager:         policy.NewPostgresManager(pool),
 		Authenticator:         authenticator,
