@@ -1,7 +1,7 @@
 # 09 — Decisions
 
 Status: Active  
-Date: 2026-08-14
+Date: 2026-08-16
 
 | ID | Decision | Status |
 |---|---|---|
@@ -14,6 +14,7 @@ Date: 2026-08-14
 | ADR-0007 | High-entropy bearer auth for the local operator API | Accepted |
 | ADR-0008 | Ownership-safe SPIRE registration reconciliation | Accepted |
 | ADR-0009 | Fail-closed roles + transactionally audited registration mutations | Accepted |
+| ADR-0010 | Immutable policy versions + transactionally audited activation | Accepted |
 
 ## Product decisions
 
@@ -21,7 +22,7 @@ Date: 2026-08-14
 - `Workload Trust Platform` is a neutral engineering working name only.
 - V1 targets Docker/Linux before Kubernetes/cloud integrations.
 - X.509-SVID is the primary V1 workload authentication mechanism.
-- Workload authorization is deterministic and default-deny.
+- Workload authorization is deterministic and intended to be default-deny.
 - Custom cryptography is prohibited.
 
 ## Phase 1 lab decisions
@@ -35,16 +36,22 @@ Date: 2026-08-14
 ## Phase 2 decisions
 
 - Go toolchain/module metadata is pinned and CI rejects a non-tidy module graph before compilation.
-- PostgreSQL migrations are tested apply/rollback/apply against real PostgreSQL.
+- PostgreSQL migrations are tested apply/rollback/re-apply against real PostgreSQL, currently through migration `000003_policy_revision`.
 - `audit_events` and `access_policy_versions` are append-only at the PostgreSQL layer.
 - `/v1/*` requires the ADR-0007 bearer credential; health/readiness remain generic and unauthenticated.
-- the HTTP listener remains loopback-only.
+- management HTTP remains loopback-only.
 - local operator roles are `viewer` and `operator`; missing role defaults to `viewer`, unsupported roles fail closed.
-- registration POST/PATCH requires server-side `registrations:write` authorization.
-- registration PATCH is a full desired-state replacement with optimistic `expected_revision`, not JSON Merge Patch.
-- registration mutation + operator audit commit atomically in one PostgreSQL transaction; audit failure rolls back state.
-- mutation responses/audit metadata omit selector values and parent SPIFFE IDs.
+- registration POST/PATCH requires `registrations:write`; mutation + audit are atomic and stale revisions fail closed.
+- policy create/version append requires `policies:write`; activation requires distinct `policies:activate`.
+- V1 policy content is limited to canonical SPIFFE source/destination IDs, `connect`, and `allow|deny`.
+- policy history is append-only; edits create new immutable versions.
+- policy append/activation requires optimistic `expected_revision`.
+- activation is allowed only for a version belonging to the target policy and stored content is revalidated before activation.
+- policy create/version/activation + operator audit commit in the same PostgreSQL transaction; audit failure rolls state back.
+- `active_version_id` means selected desired policy state only; it is **not** a claim that service traffic is authorized/enforced.
 - registration desired state is reconciled to SPIRE through the official Entry API over the local Unix management socket.
 - managed SPIRE entries use `wtp-rule:<rule-id>` as a non-cryptographic ownership convention; foreign entries fail closed rather than being adopted/mutated.
+
+Phase 3 remains responsible for verified source identity extraction, deterministic default-deny policy evaluation and service-call enforcement.
 
 See `docs/adr/` for rationale.
