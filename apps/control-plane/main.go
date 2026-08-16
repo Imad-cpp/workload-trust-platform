@@ -76,7 +76,8 @@ func run(logger *slog.Logger) error {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serveErr <- err
 			return
-		}		serveErr <- nil
+		}
+		serveErr <- nil
 	}()
 
 	select {
