@@ -26,9 +26,11 @@ func (r *PostgresReader) SummaryByOrganization(ctx context.Context, organization
 		SELECT
 			o.id::text,
 			(SELECT count(*) FROM workloads w WHERE w.organization_id = o.id),
+			(SELECT count(*) FROM workloads w WHERE w.organization_id = o.id AND w.status = 'unknown'),
 			(SELECT count(*) FROM workloads w WHERE w.organization_id = o.id AND w.status = 'healthy'),
 			(SELECT count(*) FROM workloads w WHERE w.organization_id = o.id AND w.status = 'degraded'),
 			(SELECT count(*) FROM workloads w WHERE w.organization_id = o.id AND w.status = 'offline'),
+			(SELECT count(*) FROM workloads w WHERE w.organization_id = o.id AND w.status = 'disabled'),
 			(SELECT count(*) FROM registration_rules rr WHERE rr.organization_id = o.id AND rr.reconcile_status = 'pending'),
 			(SELECT count(*) FROM registration_rules rr WHERE rr.organization_id = o.id AND rr.reconcile_status = 'converged'),
 			(SELECT count(*) FROM registration_rules rr WHERE rr.organization_id = o.id AND rr.reconcile_status = 'error'),
@@ -43,9 +45,11 @@ func (r *PostgresReader) SummaryByOrganization(ctx context.Context, organization
 	`, organizationID).Scan(
 		&summary.OrganizationID,
 		&summary.WorkloadsTotal,
+		&summary.WorkloadsUnknown,
 		&summary.WorkloadsHealthy,
 		&summary.WorkloadsDegraded,
 		&summary.WorkloadsOffline,
+		&summary.WorkloadsDisabled,
 		&summary.RegistrationsPending,
 		&summary.RegistrationsConverged,
 		&summary.RegistrationsError,
