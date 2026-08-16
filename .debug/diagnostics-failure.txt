@@ -1,0 +1,14 @@
+go: downloading github.com/jackc/pgx/v5 v5.10.0
+go: downloading github.com/jackc/puddle/v2 v2.2.2
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+go: downloading golang.org/x/text v0.29.0
+go: downloading golang.org/x/sync v0.17.0
+=== RUN   TestPostgresReaderSummarizesOrganization
+    postgres_integration_test.go:81: seed diagnostics state: ERROR: cannot insert multiple commands into a prepared statement (SQLSTATE 42601)
+--- FAIL: TestPostgresReaderSummarizesOrganization (0.02s)
+FAIL
+FAIL	github.com/Imad-cpp/workload-trust-platform/internal/diagnostics	0.030s
+FAIL
+
+exit_status=1
