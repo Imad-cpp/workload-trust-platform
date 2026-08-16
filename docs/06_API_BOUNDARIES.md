@@ -37,7 +37,7 @@ The `PATCH` route is **not** JSON Merge Patch. It replaces the mutable desired-s
 - stale revision returns `409`;
 - internal repository/database errors remain generic.
 
-Each successful registration mutation and its operator audit event commit in one PostgreSQL transaction. An audit failure aborts the desired-state mutation.
+Each successful registration mutation and its operator audit event commit in the **same PostgreSQL transaction**. An audit failure aborts the desired-state mutation.
 
 ## SPIRE reconciliation boundary
 
