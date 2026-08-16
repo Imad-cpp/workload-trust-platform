@@ -102,11 +102,11 @@ func (m *PostgresManager) Create(ctx context.Context, actor MutationActor, corre
 
 	if err := appendAudit(ctx, tx, actor, correlationID, input.OrganizationID, "access_policy.create_with_version", result.Policy.ID, map[string]any{
 		"operation":       "create_with_version",
-		"operator_role":  actor.Role,
-		"policy_status":  result.Policy.Status,
+		"operator_role":   actor.Role,
+		"policy_status":   result.Policy.Status,
 		"policy_revision": result.Policy.Revision,
-		"version_number": result.Version.VersionNumber,
-		"effect":         result.Version.Effect,
+		"version_number":  result.Version.VersionNumber,
+		"effect":          result.Version.Effect,
 	}); err != nil {
 		return CreateResult{}, err
 	}
@@ -135,7 +135,7 @@ func (m *PostgresManager) AppendVersion(ctx context.Context, actor MutationActor
 	defer func() { _ = tx.Rollback(context.Background()) }()
 
 	var (
-		organizationID string
+		organizationID  string
 		currentRevision int64
 	)
 	if err := tx.QueryRow(ctx, `
@@ -209,10 +209,10 @@ func (m *PostgresManager) AppendVersion(ctx context.Context, actor MutationActor
 
 	if err := appendAudit(ctx, tx, actor, correlationID, organizationID, "access_policy.append_version", policyID, map[string]any{
 		"operation":       "append_version",
-		"operator_role":  actor.Role,
+		"operator_role":   actor.Role,
 		"policy_revision": result.PolicyRevision,
-		"version_number": result.VersionNumber,
-		"effect":         result.Effect,
+		"version_number":  result.VersionNumber,
+		"effect":          result.Effect,
 	}); err != nil {
 		return VersionResult{}, err
 	}
@@ -304,10 +304,10 @@ func (m *PostgresManager) Activate(ctx context.Context, actor MutationActor, cor
 
 	if err := appendAudit(ctx, tx, actor, correlationID, result.OrganizationID, "access_policy.activate_version", policyID, map[string]any{
 		"operation":       "activate_version",
-		"operator_role":  actor.Role,
+		"operator_role":   actor.Role,
 		"policy_revision": result.Revision,
-		"version_id":     input.VersionID,
-		"version_number": versionNumber,
+		"version_id":      input.VersionID,
+		"version_number":  versionNumber,
 	}); err != nil {
 		return PolicyResult{}, err
 	}
