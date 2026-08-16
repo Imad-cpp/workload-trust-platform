@@ -24,7 +24,7 @@ Implemented/evidenced slices include:
 - PostgreSQL schema/migrations through policy revision migration `000003`, real integration tests and append-only security history;
 - loopback-only high-entropy bearer authentication;
 - fail-closed local `viewer` / `operator` management permissions;
-- authenticated workload inventory;
+- authenticated workload inventory and aggregate `diagnostics:read` status;
 - server-authorized registration desired-state `POST`/`PATCH` with optimistic revisions and atomic audit;
 - official SPIRE v1.15.2 Entry API reconciliation over the local Unix socket;
 - ownership-safe SPIRE create/update/delete, drift repair and foreign-entry refusal;
@@ -32,13 +32,15 @@ Implemented/evidenced slices include:
 - distinct `policies:activate` permission and optimistic policy revisions;
 - canonical SPIFFE policy validation and stored-version revalidation before activation;
 - policy state + operator audit in one PostgreSQL transaction, including forced-audit-failure rollback tests;
-- permanent real SPIRE, operator-mutation and policy-mutation CI.
+- read-only `wtpctl` for health, readiness, workload inventory and aggregate organization status;
+- CLI through the existing loopback management API with no direct PostgreSQL credential/path, redirect refusal and bounded responses;
+- permanent real SPIRE, operator-mutation, policy-mutation and CLI-diagnostics CI.
 
 The current role model is still one configured local principal, not remote/multi-user enterprise RBAC. An `active_version_id` is selected **management desired state only**; service-to-service authorization, default-deny evaluation and mTLS enforcement are not implemented yet.
 
 ## Technology
 
-- Go — control plane, reconciler, future CLI/policy enforcement integrations
+- Go — control plane, reconciler, local read-only CLI, future policy enforcement integrations
 - Next.js + React + TypeScript — planned operator console
 - PostgreSQL — product configuration and audit source of truth
 - SPIFFE / SPIRE — workload identity standard/runtime
@@ -64,6 +66,7 @@ Start with:
 - [`docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md`](docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md)
 - [`docs/17_OPERATOR_MUTATION_EVIDENCE.md`](docs/17_OPERATOR_MUTATION_EVIDENCE.md)
 - [`docs/18_POLICY_MUTATION_EVIDENCE.md`](docs/18_POLICY_MUTATION_EVIDENCE.md)
+- [`docs/19_CLI_DIAGNOSTICS_EVIDENCE.md`](docs/19_CLI_DIAGNOSTICS_EVIDENCE.md)
 
 ## Local control-plane development
 
@@ -77,6 +80,19 @@ export WTP_OPERATOR_TOKEN="$(openssl rand -hex 32)"
 go run ./apps/control-plane
 ```
 
+Use the CLI from another local shell without exposing the database URL to the CLI process:
+
+```bash
+export WTP_API_URL='http://127.0.0.1:8080'
+export WTP_OPERATOR_TOKEN='<same-local-bearer-token>'
+go run ./apps/wtpctl health
+go run ./apps/wtpctl ready
+go run ./apps/wtpctl status --organization-id '<organization-uuid>'
+go run ./apps/wtpctl workloads --organization-id '<organization-uuid>'
+```
+
+`status` is aggregate diagnostics. `workloads` intentionally returns the existing authorized workload inventory and may include workload SPIFFE IDs.
+
 Set `WTP_OPERATOR_ROLE=operator` only for a local principal that should be allowed to change registration/policy management state.
 
 No production deployment or production-readiness claim is made.
@@ -87,11 +103,13 @@ No production deployment or production-readiness claim is made.
 - no workload private-key storage in the product database;
 - management HTTP remains loopback-only;
 - `/v1/*` requires a local high-entropy bearer credential;
+- `diagnostics:read` protects aggregate diagnostics for viewer/operator;
 - registration writes require `registrations:write`;
 - policy writes require `policies:write`; activation requires distinct `policies:activate`;
 - missing role defaults to `viewer`; unknown roles fail closed;
 - registration/policy state + audit are transactionally coupled;
 - policy versions are immutable and malformed/foreign versions cannot be activated through the management workflow;
+- `wtpctl` stays local/read-only, does not connect to PostgreSQL, rejects redirects/non-loopback endpoints and bounds management responses;
 - management responses/audits avoid echoing sensitive desired-state detail;
 - SPIRE reconciliation refuses foreign entries by explicit ownership marker/binding checks;
 - active policy state is not a service-authorization result;
