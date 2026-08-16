@@ -23,8 +23,12 @@ type createPolicyRequest struct {
 }
 
 type appendPolicyVersionRequest struct {
-	ExpectedRevision int64 `json:"expected_revision"`
-	policyRuleRequest
+	ExpectedRevision   int64  `json:"expected_revision"`
+	SourceSPIFFEID      string `json:"source_spiffe_id"`
+	DestinationSPIFFEID string `json:"destination_spiffe_id"`
+	Action              string `json:"action"`
+	Effect              string `json:"effect"`
+	ChangeReason        string `json:"change_reason"`
 }
 
 type activatePolicyRequest struct {
