@@ -26,6 +26,7 @@ DECLARE
     policy_id uuid;
     policy_version_id uuid;
     audit_id uuid;
+    policy_revision bigint;
 BEGIN
     SELECT id INTO org_id FROM organizations WHERE slug = 'phase2-test';
 
@@ -47,6 +48,11 @@ BEGIN
     INSERT INTO access_policies (organization_id, name)
     VALUES (org_id, 'frontend-to-orders')
     RETURNING id INTO policy_id;
+
+    SELECT revision INTO policy_revision FROM access_policies WHERE id = policy_id;
+    IF policy_revision <> 1 THEN
+        RAISE EXCEPTION 'access policy revision default is %, expected 1', policy_revision;
+    END IF;
 
     INSERT INTO access_policy_versions (
         policy_id, version, source_spiffe_id, destination_spiffe_id,
@@ -117,4 +123,19 @@ fi
 
 "${ROOT}/scripts/db-migrate.sh" up
 
-echo "PostgreSQL migration apply/rollback/apply, policy-history, and audit append-only tests passed."
+if ! psql "${DATABASE_URL}" -Atqc "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='access_policies' AND column_name='revision')" | grep -qx t; then
+  echo "access_policies.revision is missing after re-apply" >&2
+  exit 1
+fi
+
+if [[ "$(psql "${DATABASE_URL}" -Atqc "INSERT INTO organizations (slug, display_name) VALUES ('phase2-reapply', 'Phase 2 Reapply') RETURNING id" | head -n1)" == "" ]]; then
+  echo "organization insert failed after re-apply" >&2
+  exit 1
+fi
+
+if [[ "$(psql "${DATABASE_URL}" -Atqc "SELECT column_default FROM information_schema.columns WHERE table_schema='public' AND table_name='access_policies' AND column_name='revision')" != "1" ]]; then
+  echo "access_policies.revision default is not 1 after re-apply" >&2
+  exit 1
+fi
+
+echo "PostgreSQL migration apply/rollback/apply, policy-revision, policy-history, and audit append-only tests passed."
