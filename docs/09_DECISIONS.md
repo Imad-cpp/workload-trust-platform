@@ -15,6 +15,7 @@ Date: 2026-08-16
 | ADR-0008 | Ownership-safe SPIRE registration reconciliation | Accepted |
 | ADR-0009 | Fail-closed roles + transactionally audited registration mutations | Accepted |
 | ADR-0010 | Immutable policy versions + transactionally audited activation | Accepted |
+| ADR-0011 | Local read-only CLI through the management API | Accepted |
 
 ## Product decisions
 
@@ -36,7 +37,7 @@ Date: 2026-08-16
 ## Phase 2 decisions
 
 - Go toolchain/module metadata is pinned and CI rejects a non-tidy module graph before compilation.
-- PostgreSQL migrations are tested apply/rollback/re-apply against real PostgreSQL, currently through migration `000003_policy_revision`.
+- PostgreSQL migrations are tested apply/rollback/re-apply against real PostgreSQL through migration `000003_policy_revision`.
 - `audit_events` and `access_policy_versions` are append-only at the PostgreSQL layer.
 - `/v1/*` requires the ADR-0007 bearer credential; health/readiness remain generic and unauthenticated.
 - management HTTP remains loopback-only.
@@ -49,6 +50,9 @@ Date: 2026-08-16
 - activation is allowed only for a version belonging to the target policy and stored content is revalidated before activation.
 - policy create/version/activation + operator audit commit in the same PostgreSQL transaction; audit failure rolls state back.
 - `active_version_id` means selected desired policy state only; it is **not** a claim that service traffic is authorized/enforced.
+- `diagnostics:read` is available to viewer/operator for aggregate organization diagnostics.
+- `wtpctl` is read-only and consumes the existing loopback management API rather than opening PostgreSQL directly.
+- the Phase 2 CLI refuses non-loopback management URLs, follows no redirects and does not require `DATABASE_URL`.
 - registration desired state is reconciled to SPIRE through the official Entry API over the local Unix management socket.
 - managed SPIRE entries use `wtp-rule:<rule-id>` as a non-cryptographic ownership convention; foreign entries fail closed rather than being adopted/mutated.
 
