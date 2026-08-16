@@ -31,6 +31,7 @@ REQUIRED_FILES = [
     "docs/15_CONTROL_PLANE_FOUNDATION.md",
     "docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md",
     "docs/17_OPERATOR_MUTATION_EVIDENCE.md",
+    "docs/18_POLICY_MUTATION_EVIDENCE.md",
     "docs/adr/0001-go-core.md",
     "docs/adr/0002-spiffe-spire.md",
     "docs/adr/0003-modular-control-plane.md",
@@ -40,6 +41,7 @@ REQUIRED_FILES = [
     "docs/adr/0007-local-operator-bearer-auth.md",
     "docs/adr/0008-spire-registration-reconciliation.md",
     "docs/adr/0009-authorized-audited-registration-mutations.md",
+    "docs/adr/0010-transactionally-audited-policy-versioning-activation.md",
 ]
 
 REQUIRED_PHRASES = {
@@ -47,20 +49,23 @@ REQUIRED_PHRASES = {
     "docs/02_THREAT_MODEL.md": ["attestation", "fail closed"],
     "docs/03_SECURITY_INVARIANTS.md": ["default-deny", "Authentication", "Authorization", "No custom cryptographic primitives", "fail closed"],
     "docs/04_IDENTITY_MODEL.md": ["SPIFFE", "X.509-SVID"],
-    "docs/05_POLICY_MODEL.md": ["ALLOW", "DENY"],
-    "docs/06_API_BOUNDARIES.md": ["loopback-only", "registrations:write", "expected_revision", "same PostgreSQL transaction"],
+    "docs/05_POLICY_MODEL.md": ["ALLOW", "DENY", "active_version_id", "not implemented in Phase 2"],
+    "docs/06_API_BOUNDARIES.md": ["loopback-only", "registrations:write", "policies:activate", "expected_revision", "same PostgreSQL transaction", "not policy enforcement"],
     "docs/07_V1_SCOPE.md": ["Docker", "Linux"],
-    "docs/08_DEFINITION_OF_DONE.md": ["security", "test", "Server-side authorization"],
+    "docs/08_DEFINITION_OF_DONE.md": ["security", "test", "Server-side authorization", "Default deny service authorization"],
+    "docs/12_DATA_MODEL.md": ["000003_policy_revision", "active_version_id", "selected desired policy state"],
     "docs/13_IDENTITY_LAB.md": ["Phase 1 complete", "workload-trust.test", "Docker workload-attestation", "insecure_bootstrap", "12-second X.509-SVID TTL", "not a production"],
     "docs/14_PHASE1_EVIDENCE.md": ["Docker workload attestation", "automatic SVID rotation", "does not prove service authorization"],
-    "docs/15_CONTROL_PLANE_FOUNDATION.md": ["loopback-only", "append-only", "does not complete Phase 2", "no workload mutation route exists"],
+    "docs/15_CONTROL_PLANE_FOUNDATION.md": ["loopback-only", "append-only", "does not complete Phase 2", "no workload mutation route exists", "policies:activate"],
     "docs/16_OPERATOR_AUTH_AND_RECONCILIATION.md": ["constant-time", "wtp-rule:", "foreign", "does not prove service authorization"],
     "docs/17_OPERATOR_MUTATION_EVIDENCE.md": ["transactionally audited", "viewer", "409", "does not"],
+    "docs/18_POLICY_MUTATION_EVIDENCE.md": ["same PostgreSQL transaction", "foreign-version", "active_version_id", "not workload service authorization"],
     "docs/adr/0005-v1-lab-attestation.md": ["host-native SPIRE", "Docker-label attestation"],
     "docs/adr/0006-read-only-loopback-api-before-auth.md": ["read-only and loopback-only", "operator authentication/authorization"],
     "docs/adr/0007-local-operator-bearer-auth.md": ["loopback-only", "constant-time", "32 bytes"],
     "docs/adr/0008-spire-registration-reconciliation.md": ["wtp-rule:", "foreign", "not a cryptographic ownership proof"],
     "docs/adr/0009-authorized-audited-registration-mutations.md": ["registrations:write", "same PostgreSQL transaction", "expected_revision"],
+    "docs/adr/0010-transactionally-audited-policy-versioning-activation.md": ["policies:activate", "same PostgreSQL transaction", "Activation does not mean", "expected_revision"],
 }
 
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -108,6 +113,8 @@ def check_readme_claim_boundary() -> None:
     required = "No production deployment or production-readiness claim is made."
     if required not in readme:
         fail(f"README.md must keep the claim boundary: {required}")
+    if "active policy state is not a service-authorization result" not in readme.lower():
+        fail("README.md must distinguish policy activation from service authorization")
 
 
 def check_ephemeral_runtime_ignored() -> None:
