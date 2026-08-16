@@ -11,9 +11,11 @@ var ErrNotFound = errors.New("diagnostics organization not found")
 type Summary struct {
 	OrganizationID         string     `json:"organization_id"`
 	WorkloadsTotal         int64      `json:"workloads_total"`
+	WorkloadsUnknown       int64      `json:"workloads_unknown"`
 	WorkloadsHealthy       int64      `json:"workloads_healthy"`
 	WorkloadsDegraded      int64      `json:"workloads_degraded"`
 	WorkloadsOffline       int64      `json:"workloads_offline"`
+	WorkloadsDisabled      int64      `json:"workloads_disabled"`
 	RegistrationsPending   int64      `json:"registrations_pending"`
 	RegistrationsConverged int64      `json:"registrations_converged"`
 	RegistrationsError     int64      `json:"registrations_error"`
