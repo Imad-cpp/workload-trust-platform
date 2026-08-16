@@ -17,6 +17,7 @@ func TestViewerCannotWriteRegistrationsOrPolicies(t *testing.T) {
 		PermissionWorkloadsRead,
 		PermissionRegistrationsRead,
 		PermissionPoliciesRead,
+		PermissionDiagnosticsRead,
 	} {
 		if !(RBAC{}).Allowed(principal, permission) {
 			t.Fatalf("viewer should retain %q", permission)
@@ -30,6 +31,7 @@ func TestOperatorCanManageRegistrationsAndPolicies(t *testing.T) {
 		PermissionRegistrationsWrite,
 		PermissionPoliciesWrite,
 		PermissionPoliciesActivate,
+		PermissionDiagnosticsRead,
 	} {
 		if !(RBAC{}).Allowed(principal, permission) {
 			t.Fatalf("operator should receive %q", permission)
@@ -41,6 +43,7 @@ func TestUnknownRoleFailsClosed(t *testing.T) {
 	principal := Principal{ActorType: "operator", ActorID: "unknown", Role: Role("owner")}
 	if (RBAC{}).Allowed(principal, PermissionWorkloadsRead) ||
 		(RBAC{}).Allowed(principal, PermissionPoliciesRead) ||
+		(RBAC{}).Allowed(principal, PermissionDiagnosticsRead) ||
 		(RBAC{}).Allowed(principal, PermissionPoliciesActivate) {
 		t.Fatal("unknown role unexpectedly received permission")
 	}
