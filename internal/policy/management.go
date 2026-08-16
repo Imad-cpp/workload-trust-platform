@@ -70,10 +70,11 @@ type PolicyResult struct {
 }
 
 type VersionResult struct {
-	ID            string `json:"id"`
-	PolicyID      string `json:"policy_id"`
-	VersionNumber int64  `json:"version_number"`
-	Effect        string `json:"effect"`
+	ID             string `json:"id"`
+	PolicyID       string `json:"policy_id"`
+	VersionNumber  int64  `json:"version_number"`
+	PolicyRevision int64  `json:"policy_revision"`
+	Effect         string `json:"effect"`
 }
 
 type CreateResult struct {
