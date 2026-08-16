@@ -115,7 +115,10 @@ STATUS="$(http_status \
   "http://127.0.0.1:${VIEWER_PORT}/v1/policies")"
 [[ "${STATUS}" == "403" ]] || { echo "Viewer policy mutation returned ${STATUS}, want 403." >&2; exit 1; }
 
-PRE_POLICIES="$(sql_scalar -v org="${ORG_ID}" -c "SELECT count(*) FROM access_policies WHERE organization_id = :'org'::uuid")"
+PRE_POLICIES="$(sql_scalar -v org="${ORG_ID}" <<'SQL'
+SELECT count(*) FROM access_policies WHERE organization_id = :'org'::uuid;
+SQL
+)"
 PRE_AUDITS="$(sql_scalar -c "SELECT count(*) FROM audit_events WHERE action LIKE 'access_policy.%'")"
 [[ "${PRE_POLICIES}" == "0" && "${PRE_AUDITS}" == "0" ]] || {
   echo "Unauthorized policy requests changed persistent state." >&2
@@ -135,8 +138,14 @@ STATUS="$(http_status \
 [[ "${STATUS}" == "201" ]] || { echo "Operator policy create returned ${STATUS}, want 201." >&2; exit 1; }
 assert_response_safe "${SOURCE_ID}" "${DESTINATION_ID}" "${CREATE_REASON}"
 
-POLICY_ID="$(sql_scalar -v org="${ORG_ID}" -c "SELECT id::text FROM access_policies WHERE organization_id = :'org'::uuid AND name = 'frontend to orders'")"
-VERSION1_ID="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT id::text FROM access_policy_versions WHERE policy_id = :'policy'::uuid AND version = 1")"
+POLICY_ID="$(sql_scalar -v org="${ORG_ID}" <<'SQL'
+SELECT id::text FROM access_policies WHERE organization_id = :'org'::uuid AND name = 'frontend to orders';
+SQL
+)"
+VERSION1_ID="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT id::text FROM access_policy_versions WHERE policy_id = :'policy'::uuid AND version = 1;
+SQL
+)"
 [[ -n "${POLICY_ID}" && -n "${VERSION1_ID}" ]] || { echo "Created policy/version missing." >&2; exit 1; }
 IFS='|' read -r POLICY_STATUS POLICY_REVISION ACTIVE_COUNT VERSION_COUNT <<<"$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
 SELECT status || '|' || revision::text || '|' ||
@@ -170,10 +179,22 @@ STATUS="$(http_status \
 [[ "${STATUS}" == "201" ]] || { echo "Policy version append returned ${STATUS}, want 201." >&2; exit 1; }
 assert_response_safe "${SOURCE_ID}" "${DESTINATION_ID}" "${APPEND_REASON}"
 
-VERSION2_ID="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT id::text FROM access_policy_versions WHERE policy_id = :'policy'::uuid AND version = 2")"
-POLICY_REVISION="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT revision FROM access_policies WHERE id = :'policy'::uuid")"
-VERSION_COUNT="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT count(*) FROM access_policy_versions WHERE policy_id = :'policy'::uuid")"
-APPEND_AUDITS="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT count(*) FROM audit_events WHERE target_id = :'policy' AND action = 'access_policy.append_version' AND actor_id = 'operator-policy-ci'")"
+VERSION2_ID="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT id::text FROM access_policy_versions WHERE policy_id = :'policy'::uuid AND version = 2;
+SQL
+)"
+POLICY_REVISION="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT revision FROM access_policies WHERE id = :'policy'::uuid;
+SQL
+)"
+VERSION_COUNT="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT count(*) FROM access_policy_versions WHERE policy_id = :'policy'::uuid;
+SQL
+)"
+APPEND_AUDITS="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT count(*) FROM audit_events WHERE target_id = :'policy' AND action = 'access_policy.append_version' AND actor_id = 'operator-policy-ci';
+SQL
+)"
 [[ -n "${VERSION2_ID}" && "${POLICY_REVISION}" == "2" && "${VERSION_COUNT}" == "2" && "${APPEND_AUDITS}" == "1" ]] || {
   echo "Appended policy version state/audit is inconsistent." >&2
   exit 1
@@ -186,9 +207,18 @@ STATUS="$(http_status \
   --data "${APPEND_BODY}" \
   "http://127.0.0.1:${OPERATOR_PORT}/v1/policies/${POLICY_ID}/versions")"
 [[ "${STATUS}" == "409" ]] || { echo "Stale policy revision returned ${STATUS}, want 409." >&2; exit 1; }
-STALE_REVISION="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT revision FROM access_policies WHERE id = :'policy'::uuid")"
-STALE_VERSIONS="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT count(*) FROM access_policy_versions WHERE policy_id = :'policy'::uuid")"
-STALE_AUDITS="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT count(*) FROM audit_events WHERE target_id = :'policy' AND action = 'access_policy.append_version'")"
+STALE_REVISION="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT revision FROM access_policies WHERE id = :'policy'::uuid;
+SQL
+)"
+STALE_VERSIONS="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT count(*) FROM access_policy_versions WHERE policy_id = :'policy'::uuid;
+SQL
+)"
+STALE_AUDITS="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT count(*) FROM audit_events WHERE target_id = :'policy' AND action = 'access_policy.append_version';
+SQL
+)"
 [[ "${STALE_REVISION}" == "2" && "${STALE_VERSIONS}" == "2" && "${STALE_AUDITS}" == "1" ]] || {
   echo "Stale policy append changed persistent/audit state." >&2
   exit 1
@@ -211,7 +241,10 @@ FROM access_policies
 WHERE id = :'policy'::uuid;
 SQL
 )"
-ACTIVATE_AUDITS="$(sql_scalar -v policy="${POLICY_ID}" -c "SELECT count(*) FROM audit_events WHERE target_id = :'policy' AND action = 'access_policy.activate_version' AND actor_id = 'operator-policy-ci'")"
+ACTIVATE_AUDITS="$(sql_scalar -v policy="${POLICY_ID}" <<'SQL'
+SELECT count(*) FROM audit_events WHERE target_id = :'policy' AND action = 'access_policy.activate_version' AND actor_id = 'operator-policy-ci';
+SQL
+)"
 [[ "${ACTIVE_STATUS}" == "active" && "${ACTIVE_REVISION}" == "3" && "${ACTIVE_MATCH}" == "1" && "${ACTIVATE_AUDITS}" == "1" ]] || {
   echo "Activated policy state/audit is inconsistent." >&2
   exit 1
@@ -225,8 +258,14 @@ STATUS="$(http_status \
   --data "${SECOND_BODY}" \
   "http://127.0.0.1:${OPERATOR_PORT}/v1/policies")"
 [[ "${STATUS}" == "201" ]] || { echo "Second policy create returned ${STATUS}, want 201." >&2; exit 1; }
-SECOND_POLICY_ID="$(sql_scalar -v org="${ORG_ID}" -c "SELECT id::text FROM access_policies WHERE organization_id = :'org'::uuid AND name = 'foreign policy'")"
-FOREIGN_VERSION_ID="$(sql_scalar -v policy="${SECOND_POLICY_ID}" -c "SELECT id::text FROM access_policy_versions WHERE policy_id = :'policy'::uuid AND version = 1")"
+SECOND_POLICY_ID="$(sql_scalar -v org="${ORG_ID}" <<'SQL'
+SELECT id::text FROM access_policies WHERE organization_id = :'org'::uuid AND name = 'foreign policy';
+SQL
+)"
+FOREIGN_VERSION_ID="$(sql_scalar -v policy="${SECOND_POLICY_ID}" <<'SQL'
+SELECT id::text FROM access_policy_versions WHERE policy_id = :'policy'::uuid AND version = 1;
+SQL
+)"
 FOREIGN_ACTIVATE_BODY="$(printf '{\"expected_revision\":3,\"version_id\":\"%s\"}' "${FOREIGN_VERSION_ID}")"
 STATUS="$(http_status \
   --request POST \
@@ -256,7 +295,10 @@ SQL
 )"
 [[ "${LEAK_COUNT}" == "0" ]] || { echo "Policy audit metadata leaked rule material." >&2; exit 1; }
 
-if sql_scalar -v version="${VERSION1_ID}" -c "UPDATE access_policy_versions SET effect = 'deny' WHERE id = :'version'::uuid" >/dev/null 2>&1; then
+if sql_scalar -v version="${VERSION1_ID}" >/dev/null 2>&1 <<'SQL'
+UPDATE access_policy_versions SET effect = 'deny' WHERE id = :'version'::uuid;
+SQL
+then
   echo "Immutable policy version accepted UPDATE." >&2
   exit 1
 fi
