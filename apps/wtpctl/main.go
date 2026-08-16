@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	defaultAPIURL = "http://127.0.0.1:8080"
-	minTokenBytes = 32
+	defaultAPIURL    = "http://127.0.0.1:8080"
+	minTokenBytes    = 32
+	maxResponseBytes = 1 << 20
 )
 
 type apiClient struct {
@@ -177,9 +178,12 @@ func (c *apiClient) printGET(ctx context.Context, path string, authenticated boo
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return errors.New("could not read management API response")
+	}
+	if len(body) > maxResponseBytes {
+		return errors.New("management API response exceeded 1 MiB limit")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var envelope errorEnvelope
