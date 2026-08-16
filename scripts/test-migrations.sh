@@ -123,22 +123,25 @@ fi
 
 "${ROOT}/scripts/db-migrate.sh" up
 
-REVISION_COLUMN_PRESENT="$(psql "${DATABASE_URL}" -Atqc "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='access_policies' AND column_name='revision')")"
-if [[ "${REVISION_COLUMN_PRESENT}" != "t" ]]; then
-  echo "access_policies.revision is missing after re-apply" >&2
-  exit 1
-fi
+psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+DO $$
+DECLARE
+    org_id uuid;
+    policy_revision bigint;
+BEGIN
+    INSERT INTO organizations (slug, display_name)
+    VALUES ('phase2-reapply', 'Phase 2 Reapply')
+    RETURNING id INTO org_id;
 
-REAPPLY_ORG_ID="$(psql "${DATABASE_URL}" -Atqc "INSERT INTO organizations (slug, display_name) VALUES ('phase2-reapply', 'Phase 2 Reapply') RETURNING id" | head -n1)"
-if [[ -z "${REAPPLY_ORG_ID}" ]]; then
-  echo "organization insert failed after re-apply" >&2
-  exit 1
-fi
+    INSERT INTO access_policies (organization_id, name)
+    VALUES (org_id, 'phase2-reapply-policy')
+    RETURNING revision INTO policy_revision;
 
-REVISION_DEFAULT="$(psql "${DATABASE_URL}" -Atqc "SELECT column_default FROM information_schema.columns WHERE table_schema='public' AND table_name='access_policies' AND column_name='revision')"
-if [[ "${REVISION_DEFAULT}" != "1" ]]; then
-  echo "access_policies.revision default is not 1 after re-apply" >&2
-  exit 1
-fi
+    IF policy_revision <> 1 THEN
+        RAISE EXCEPTION 'access policy revision default after re-apply is %, expected 1', policy_revision;
+    END IF;
+END
+$$;
+SQL
 
 echo "PostgreSQL migration apply/rollback/apply, policy-revision, policy-history, and audit append-only tests passed."
